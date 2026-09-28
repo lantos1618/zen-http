@@ -36,3 +36,20 @@ standard-library HTTP protocol modules and `Env.http` behavior untouched.
 
 Correctness checks cover HTTP/1, TLS, disconnects and experimental H2. Historical
 throughput results predate this migration; no performance improvement is claimed.
+
+## Validation on 2026-09-28
+
+The full `scripts/check.sh` suite passed on macOS arm64 and Linux x86_64 for
+HTTP revision `358cfd98efefcb60006a976547a01a3b1f1c5563` with std readiness
+implementation `b283fc2d49f33076fb6247b44eb6f63929828fd1`. Both runs include
+HTTP/1/TLS response contracts, abrupt disconnect survival, H2 client and state
+checks, request/HPACK validation, independent H2 network peers, and UBSan.
+The separate std readiness suite and its negative slot control passed on both
+platforms. The full compiler aggregate suite was not rerun for this library change.
+
+The isolated Linux run used kernel 6.8.0-139-generic, Clang 18.1.3 and
+zen-crypto `68d9171124b088f841b5a8a452c6c472c866c36c`. Its compiler executable
+SHA-256 was `20a378afaf09f67fdae74498723add6c796d6c602a3b266bbe1cfb4983d4865e`;
+it was the previously built public main compiler, supplied the new std sources.
+Generated C still emits the compiler's existing parentheses warnings on Linux.
+No throughput comparison was rerun or inferred from these correctness tests.
