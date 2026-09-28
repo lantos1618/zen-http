@@ -11,7 +11,7 @@ with a forwarding alias that still depends on its old implementation.
 Next server work, driven by measured bottlenecks:
 
 1. kqueue/epoll readiness adapters and bounded per-connection work are implemented.
-   Execute the Linux path. Readiness is currently level-triggered;
+   Both macOS and Linux paths pass the current integration suite. Readiness is currently level-triggered;
    an edge-triggered variant must explicitly drain all kernel and TLS input. Add deterministic forced-short-write
    and readiness retry tests, including TLS WANT_READ during writes.
 2. Expose caller-chosen connection/buffer budgets, deadlines and graceful drain.
@@ -24,16 +24,16 @@ Next server work, driven by measured bottlenecks:
    one actor per connection.
 5. Profile exact optimized binaries and allocation counts. Test a persistent
    TLS client with reusable contexts separately from server steady-state echo.
-6. Run on isolated Linux cores with a separate load-generator machine, report
-   server CPU/RSS, client headroom, errors, trial dispersion and offered-load
-   latency. Add Cinatra/lithium only after the uWS contract is stable.
+6. Extend the Linux same-host, disjoint-CPU benchmark to a separate
+   load-generator machine and characterize physical isolation, client headroom
+   and offered-load latency. Lifetime server CPU/RSS accounting is implemented. Add Cinatra/lithium only after the uWS contract is stable.
 
 Success is a reproducible workload-specific win while preserving correctness.
 Do not treat a reduced-feature prototype beating a complete library as proof of
 production equivalence, or claim the private implementation in screenshots was
 measured when its binary and test contract are unavailable.
 
-## Native Zen / HTTP/2 checkpoint
+## Earlier native Zen / HTTP/2 checkpoint (historical)
 
 Completed: migrated the existing Zen HTTP/2 client, frame codec and HPACK code
 into the package; wired it to zen-crypto; added package codec and loopback wire
@@ -46,7 +46,7 @@ header-backed records. Keep cryptographic algorithms in vetted backends until
 native implementations meet the crypto project's validation requirements.
 
 
-## Parallel hardening checkpoint
+## Earlier parallel hardening checkpoint (historical)
 
 Implemented and tested in this batch: bounded HTTP/1 scheduling with preserved
 userspace wakeups; parser field/token boundaries; socket/TLS retry policy in Zen;
@@ -80,6 +80,23 @@ pipelining and ambiguity-rejection checks over plaintext/TLS under UBSan.
 Immediate next work: a multi-connection HTTP/2 reactor with bounded output
 queues/read-write interleaving; precise stream-vs-connection errors and broader
 conformance testing; generic streaming handler APIs; configurable limits and
-application shutdown; Linux runtime validation. The existing client still
+application shutdown. Linux runtime validation now passes. The existing client still
 permits only one active request per connection. No new benchmark claim accompanies
 this checkpoint. See H2_NETWORK.md, H2_REQUEST.md and HTTP1_CHUNKED.md.
+
+
+## Public Linux validation checkpoint
+
+`zen-http` and `zen-crypto` are public repositories. The complete HTTP package
+check script passes on macOS and Linux, including HTTP/1 and HTTP/2 plaintext/TLS
+checks, independent HTTP/2 peer checks, UBSan and abrupt-disconnect regression
+tests. Linux testing exposed a real TLS SIGPIPE crash; the crypto adapter now
+uses a borrowed socket BIO with `MSG_NOSIGNAL`, without changing the process-wide
+signal handler. OpenSSL library placement and the uSockets Clang LTO toolchain
+were also corrected for reproducible Linux builds.
+
+The existing `~/zenc` checkout on the validation host was preserved; validation
+used an isolated checkout of the published compiler and package revisions.
+This validates the documented bounded cases, not full HTTP/2 conformance,
+production readiness, cryptographic implementation correctness or ASan safety.
+See RESULTS.md for measured performance and exact build evidence.

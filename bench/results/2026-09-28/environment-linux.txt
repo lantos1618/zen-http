@@ -1,0 +1,134 @@
+Linux dev-box 6.8.0-139-generic #139-Ubuntu SMP PREEMPT_DYNAMIC Sat Aug  1 03:52:05 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
+Ubuntu clang version 18.1.3 (1ubuntu1)
+Target: x86_64-pc-linux-gnu
+Thread model: posix
+InstalledDir: /usr/bin
+go version go1.23.4 linux/amd64
+OpenSSL 3.5.4 30 Sep 2025 (Library: OpenSSL 3.5.4 30 Sep 2025)
+4e7578d175fcb6d2f5b3ae7ad7b13ce14f4309d8
+86097c490263ab662d62e8e7b541390bdec7d149
+20a378afaf09f67fdae74498723add6c796d6c602a3b266bbe1cfb4983d4865e  /home/ubuntu/zen-http-validation-20260928-1952/zen-http/../zen-actor-runtime/zen
+43b6b285007010f6b2e1c4ba79bf55681d6d6851c21e32c6fb02a47206c9ac7c  src/http/chunked.zen
+c8cf5708a9efcad570622239a1ea10d574782b9f04106c05fffdddc7d5a371f0  src/http/client.zen
+eabd62f190d8611692ed70ea3ddc43bbaf93c7763c2dcc9a45a2065363cacc8b  src/http/client_decode.zen
+63fd8d73eb279149ac8f8e3e819068881137837a628c029dce3b8c5c824c58b2  src/http/client_types.zen
+585af7f44ecb48f879538ece39f838a18f74ae86d8a7d7f289005f3107ddaab8  src/http/http.zen
+f108d498ffa581d58addbf858b7e0f994742e16406f453d798593ab5522dba55  src/http/http2.zen
+ce115d8aae834b470e9583ec35dd1bcc1f2c04c50a8f49d2dc1ce3eef76b5aff  src/http/http2_client.zen
+2707f4dc0135d2b7c9ce401b7289158e08fb3f917476ddf818b483190555bf4e  src/http/http2_frame.zen
+9b764a97ef5cece0d7d3430a8e773eec426a0f679c0027700512807a1b406282  src/http/http2_hpack.zen
+36d6f9f0918f9053732f7933c6634450b31a98496e36d1fcc6d2ec05a9dda329  src/http/http2_request.zen
+ceca09f8751ecabc6a34bd632f5b6f367962e88033ebdd855155586a27aa06cc  src/http/http2_server.zen
+919d7e1108349952644cc0a57361cfa084f01f3f922807397a94ae5b29dffab0  src/http/http2_server_state.zen
+3a64a9edbb143d54493d315b2cb19b9f5c443a2989fff95eb474d62aec7b9ee8  src/http/http2_types.zen
+bbaa9c108d5557123e929d2a32e1a5b00df0f37b680718e1ace222cd3173a7a1  src/http/server.zen
+0889e5a79b19db332849911939f042593969b799faa79ae31e61fcd2fbfaf2d7  src/http/transport.zen
+55a9caf8d0b384a0e64395b87d258cab918d510f2a8d901dd0ed50fb800e0839  src/transport.h
+25b627cac0d1dac442caef7cf3dff5b08957cee84d403fb700505391cd985d21  src/reactor.h
+e07e96424be59e8cd4ba327515e66bfc8d77a09ec07c25240421123928f6e344  ../zen-crypto/src/tls.zen
+ac60c034b12d64bddce54059d48fae5aea9e3a15c78364c93000d770e28143bf  ../zen-crypto/src/zen_tls.h
+e79acf43e414a76023d00e11303afdbcbf0faae2644403068afeb7803e3dbf18  bench/uws.cpp
+3d2cfdb1e3f5210e48ab6b30eac393c0844ecf275a3bef26adf3f67dde9702a0  bench/load.go
+c74075be3fa448f155f593a14b90401891fc0bd38d3364074e9a1e7dcedaed72  build/zen.c
+2cc4d54566300aea565390cae5ec037b41c13f33659f31c6dbf72ce7aad17a6e  build/client.c
+3bbe82a1d6fdc164195da05fb49c25ebb143c51fd44be444d5c2cec92e1b759f  build/h2-server.c
+57c51967b72e514daede585b5c608ef7e8c54bc62a7ea2fdd4925c358bc17802  build/zen-h2-server
+da5344e831d21f19526692f69579858b5892169d643182a4536a9d3f434d0566  build/zen-server
+831a1aa1342dfed9da308c00c22b751289ee902b265b0655b6329e745af3badc  build/uws-server
+2a83a2f270ab004ecb3a511f504dd3e5e22f56c54b58504735d97b954420a2bd  build/load
+4bece1798aace83d622e0c19f6533d091064e32c8df3a58c854f090d5900fac6  /home/ubuntu/zen-http-validation-20260928-1952/zen-http/build/openssl/lib/libssl.a
+934ac03b3ca289444d1fa662c7f96becbfd682dbccaa45a29fd136bcb9288ea7  /home/ubuntu/zen-http-validation-20260928-1952/zen-http/build/openssl/lib/libcrypto.a
+eb1bfc5813a6cda888ebabd42a9812b4fe2c2b54794bf0bb173b857957368c31  build/cert.pem
+
+Published source revisions:
+0a58b716ca440aa8aea6f9abb414eca3a5340f4f
+3c041cd983144646fc3d0304242522456326e5f6
+f1bd2a8ac383b2d309ebe0939ebe762f6f570222
+
+Linux CPU information:
+Architecture:                            x86_64
+CPU op-mode(s):                          32-bit, 64-bit
+Address sizes:                           40 bits physical, 48 bits virtual
+Byte Order:                              Little Endian
+CPU(s):                                  16
+On-line CPU(s) list:                     0-15
+Vendor ID:                               AuthenticAMD
+Model name:                              AMD EPYC-Milan Processor
+CPU family:                              25
+Model:                                   1
+Thread(s) per core:                      1
+Core(s) per socket:                      1
+Socket(s):                               16
+Stepping:                                1
+BogoMIPS:                                4799.99
+Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm rep_good nopl cpuid extd_apicid tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm svm cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext perfctr_core ssbd ibrs ibpb stibp vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves clzero xsaveerptr wbnoinvd arat npt nrip_save umip pku ospke rdpid fsrm
+Virtualization:                          AMD-V
+Hypervisor vendor:                       KVM
+Virtualization type:                     full
+L1d cache:                               512 KiB (16 instances)
+L1i cache:                               512 KiB (16 instances)
+L2 cache:                                8 MiB (16 instances)
+L3 cache:                                512 MiB (16 instances)
+NUMA node(s):                            1
+NUMA node0 CPU(s):                       0-15
+Vulnerability Gather data sampling:      Not affected
+Vulnerability Indirect target selection: Not affected
+Vulnerability Itlb multihit:             Not affected
+Vulnerability L1tf:                      Not affected
+Vulnerability Mds:                       Not affected
+Vulnerability Meltdown:                  Not affected
+Vulnerability Mmio stale data:           Not affected
+Vulnerability Reg file data sampling:    Not affected
+Vulnerability Retbleed:                  Not affected
+Vulnerability Spec rstack overflow:      Vulnerable: Safe RET, no microcode
+Vulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl
+Vulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization
+Vulnerability Spectre v2:                Mitigation; Retpolines; IBPB conditional; IBRS_FW; STIBP disabled; RSB filling; PBRSB-eIBRS Not affected; BHI Not affected
+Vulnerability Srbds:                     Not affected
+Vulnerability Tsa:                       Vulnerable: Clear CPU buffers attempted, no microcode
+Vulnerability Tsx async abort:           Not affected
+Vulnerability Vmscape:                   Not affected
+
+Run placement: server CPU 2; client CPUs 4,5,6,7. Same virtual host; no physical isolation asserted.
+
+Validation summary (full scripts/check.sh exited 0):
+server_state PASS
+server_windows PASS
+HTTP/2 prior knowledge PASS
+HTTP/2 TLS ALPN PASS
+HTTP/2 missing ALPN rejection PASS
+server_state PASS (UBSan)
+server_windows PASS (UBSan)
+request_decode PASS (UBSan)
+request_reject PASS (UBSan)
+request_vectors PASS (UBSan)
+h2c independent peer: concurrent streams, HPACK, CONTINUATION, padding, 64KiB, reset and ping PASS
+h2c zero-window stream isolation and resumption PASS
+h2c malformed frame rejection PASS
+HTTP/2 malformed request header rejection PASS
+HTTP/2 128-request GOAWAY resource limit PASS
+plaintext h2c suite PASS
+h2c independent peer: concurrent streams, HPACK, CONTINUATION, padding, 64KiB, reset and ping PASS
+h2c zero-window stream isolation and resumption PASS
+h2c malformed frame rejection PASS
+HTTP/2 malformed request header rejection PASS
+HTTP/2 128-request GOAWAY resource limit PASS
+HTTP/2 TLS incompatible/missing ALPN and untrusted certificate rejection PASS
+TLS h2 ALPN suite PASS
+h2c independent peer: concurrent streams, HPACK, CONTINUATION, padding, 64KiB, reset and ping PASS
+h2c zero-window stream isolation and resumption PASS
+h2c malformed frame rejection PASS
+HTTP/2 malformed request header rejection PASS
+HTTP/2 128-request GOAWAY resource limit PASS
+plaintext h2c suite PASS
+h2c independent peer: concurrent streams, HPACK, CONTINUATION, padding, 64KiB, reset and ping PASS
+h2c zero-window stream isolation and resumption PASS
+h2c malformed frame rejection PASS
+HTTP/2 malformed request header rejection PASS
+HTTP/2 128-request GOAWAY resource limit PASS
+HTTP/2 TLS incompatible/missing ALPN and untrusted certificate rejection PASS
+TLS h2 ALPN suite PASS
+PASS zen-sanitized HTTP: echo, fragmentation, pipelining, close, slow reader, rejection
+PASS zen-sanitized TLS: echo, fragmentation, pipelining, close, slow reader, rejection
+zen-sanitized HTTP abrupt disconnect survival PASS
+zen-sanitized TLS abrupt disconnect survival PASS

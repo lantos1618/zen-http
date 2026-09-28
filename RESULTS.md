@@ -1,12 +1,63 @@
 # Zen HTTP versus native uWebSockets — 2026-09-28
 
-The subsequent chunked-request and HTTP/2 network implementation has not been
-benchmarked. All results below apply to their recorded source/binary hashes,
-not automatically to the current checkout.
+## Latest Linux run — current implementation
 
-## Latest measured hardening run
+[Full matrix and server resource measurements](bench/results/2026-09-28/linux.md),
+[all 48 raw trials](bench/results/2026-09-28/linux.json), and
+[build, revision and validation evidence](bench/results/2026-09-28/environment-linux.txt).
+All planned trials completed with response validation. This measures `zen-http`
+`0a58b71` with `zen-crypto` `3c041cd` and compiler `f1bd2a8`; later documentation
+commits do not change the measured binaries.
 
-[Full current matrix and trial ranges](bench/results/2026-09-28/hardening.md),
+**Zen does not beat uWebSockets overall in this run.** For 16-KiB plaintext
+at 32 connections, the median paired throughput ratio is **1.052x**
+(observed range **1.010–1.087x**); median-trial p99 is **899.3 µs versus 975.2 µs**.
+For the same workload over TLS, the ratio is **0.789x** (**0.778–0.795x**):
+Zen is **21.1% slower** by the paired median, with p99 **2446.2 µs versus
+1917.7 µs**. The large-body concurrent TLS path is the clearest profiling target.
+Small concurrent plaintext is approximately tied; all four TLS paired medians
+are below 1.0. Three short trials cannot establish a universal ranking.
+
+This is Linux x86_64 on a 16-vCPU virtual host, Clang18.1.3 and Go1.23.4,
+using the same pinned native uWebSockets/uSockets and OpenSSL3.5.4 revisions
+listed below. Each server is pinned to CPU2 and the client to CPUs4–7.
+Physical-core isolation and exclusive host use are not asserted. Each trial
+uses one second of warmup followed by three seconds of measurement, IPv4
+loopback, persistent connections and one outstanding request per connection.
+Server order alternates. Server CPU seconds and peak RSS include startup and
+warmup; p99 is the median of trial p99s, not a pooled percentile. Observed
+minima/maxima are not confidence intervals. Client overhead remains part of
+this same-host closed-loop experiment.
+
+The measured implementation includes bounded HTTP/1 chunk decoding, but the
+benchmark sends Content-Length requests. HTTP/2 is tested separately and has
+**no performance result**. Remote-client, offered-load latency, handshake
+throughput, client throughput and production equivalence remain unestablished.
+Both macOS and Linux full HTTP package check scripts pass, including the
+documented HTTP/2 peer checks, UBSan and abrupt-disconnect regressions. Linux
+validation exposed and fixed a TLS SIGPIPE crash before this benchmark.
+
+Reproduce after dependencies and `scripts/check.sh`:
+
+```sh
+python3 bench/run.py --trials 3 --seconds 3 --sizes 64 16384 \
+  --connections 1 32 --server-cpu 2 --client-cpus 4 5 6 7 \
+  --output build/linux-reproduction.json
+python3 bench/report.py build/linux-reproduction.json --output build/linux-reproduction.md
+```
+
+Choose permitted, disjoint CPU sets for your machine; do not overwrite prior
+raw results. The Linux compiler was built from its checked-in bootstrap with
+`make build/bootstrap/zen-seed CC=clang CFLAGS='-O2 -std=c99'`, then copied to
+`zen`. Full compiler validation was not performed; its focused native socket
+regression and the package integration suites passed.
+
+## Previous macOS hardening run (historical)
+
+The following historical results apply only to their recorded source/binary
+hashes. They predate the chunked-request and HTTP/2 network implementation.
+
+[Full historical matrix and trial ranges](bench/results/2026-09-28/hardening.md),
 [all 48 raw trials](bench/results/2026-09-28/hardening.json), and
 [build/source evidence](bench/results/2026-09-28/environment-hardening.txt).
 Three paired trials per cell, 64-byte / 16-KiB bodies, 1 / 32 connections,
@@ -22,8 +73,8 @@ cell: this run does not establish a consistent TLS throughput advantage. For
 1380.1 µs for uWS**, despite a slightly higher throughput median.
 
 The same-host desktop environment has substantial dispersion. These are observed
-ranges, not confidence intervals. Server CPU/RSS, isolated Linux cores, remote
-load, offered-load latency and HTTP/2 performance remain unmeasured. The changed
+ranges, not confidence intervals. This historical run did not measure server
+CPU/RSS, isolated Linux cores, remote load, offered-load latency or HTTP/2 performance. The changed
 client timing means direct before/after rates do not isolate server regressions.
 
 ## Earlier run (historical)
@@ -64,7 +115,7 @@ The strongest plain HTTP cell also reduces median-trial p99 from **757.2 µs to
 All individual p50/p95/p99, request counts, durations and throughput values remain
 in [the raw final trials](bench/results/2026-09-28/final.json).
 
-## What was compared
+## What was compared in the historical macOS runs
 
 - Native C++ uWebSockets at `4e7578d175fcb6d2f5b3ae7ad7b13ce14f4309d8`,
   uSockets at `86097c490263ab662d62e8e7b541390bdec7d149`.
@@ -89,7 +140,7 @@ The OpenSSL source commit is `c1eeb9406b6142148f267594197d853403d10208`.
 ## Changes that led to this version
 
 The server began with `poll` and repeated connection scans. It now uses kqueue
-on macOS (an epoll adapter exists but has not been run on Linux). Completed
+on macOS and epoll on Linux (validated in the latest run above). Completed
 responses return to readiness without an extra speculative socket read. TLS
 records already buffered by OpenSSL are drained before waiting. The TLS adapter
 in `zen-crypto` enables read-ahead to avoid separate small record-header reads.
@@ -105,7 +156,7 @@ runs with different implementations on a busy desktop, not isolated causal A/B
 experiments. Their generated C snapshots remain under ignored `build/` locally.
 Only the final source is the maintained implementation.
 
-## Validation and limits
+## Historical validation and limits
 
 The normal `build.zen` target and matched benchmark builds pass. The full normal
 contract suite passes for both servers over HTTP and TLS. Zen's server also
@@ -123,8 +174,10 @@ by these application builds, and the OpenSSL upstream test suite was not run.
 
 The server reserves **36 MiB for 256 connection buffer pairs**, excluding allocator
 and TLS overhead; this is not an RSS measurement. It has a narrower protocol and
-lifecycle feature set than uWebSockets: no chunked request bodies, upgrades,
-streaming handlers, graceful shutdown, HTTP/2 or HTTP/3. The old standard-library
+lifecycle feature set than uWebSockets. At that historical checkpoint it had no
+chunked request bodies, upgrades, streaming handlers, graceful shutdown, HTTP/2
+or HTTP/3. Current code adds bounded chunked requests and experimental HTTP/2;
+see the README for current limitations. The old standard-library
 HTTP/TLS APIs remain for existing callers. See [the package README](README.md)
 and [remaining work](docs/PLAN.md) before treating it as a replacement server.
 
@@ -139,5 +192,5 @@ Use a Python runtime with TLS 1.3 support. The final local checks used the bundl
 Codex Python 3.12 runtime; the Xcode Python on this machine cannot negotiate it.
 
 The historical matrix applies to its recorded source hashes. The latest
-hardening run is linked at the top of this document. No HTTP/2 performance
+Linux run is linked at the top of this document. No HTTP/2 performance
 result is claimed.
