@@ -22,7 +22,7 @@ ln -sfn "$root/examples/echo_h2.zen" build/source/h2_main.zen
 ZEN_STD="$stdlib" "$compiler" build "$root/build/source" --entry h2_main.zen --emit-c -o build/h2-server.c
 clang -O3 -flto -DNDEBUG -Isrc -I../zen-crypto/src -I"$openssl/include" build/h2-server.c \
     "$openssl/lib/libssl.a" "$openssl/lib/libcrypto.a" -o build/zen-h2-server > build/h2-build.log 2>&1
-make -C build/uWebSockets/uSockets WITH_OPENSSL=1 \
+make -B -C build/uWebSockets/uSockets CC=clang CXX=clang++ WITH_OPENSSL=1 \
     CFLAGS="-I$openssl/include" CXXFLAGS="-I$openssl/include" > build/usockets-build.log 2>&1
 clang++ -std=c++20 -O3 -flto -DNDEBUG -DUWS_HTTPRESPONSE_NO_WRITEMARK \
     -Ibuild/uWebSockets/src -Ibuild/uWebSockets/uSockets/src -I"$openssl/include" \
