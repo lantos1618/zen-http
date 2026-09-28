@@ -4,7 +4,7 @@ NativeTransport = c.record("transport.h", "struct transport", {
     fd: i32,
     ssl: Ptr<()>,
     want :: i32,
-    armed: i32,
+    armed :: i32,
 })
 Native = c.bind("transport.h", {
     POLLIN: i32
@@ -66,4 +66,18 @@ resume_read* = (handle: Ptr<()>) i32 {
 transport_h2_selected* = (handle: Ptr<()>) bool {
     transport = handle.to<NativeTransport>().read(0);
     server_h2_selected(transport.ssl)
+}
+
+// Readiness metadata stays in Zen; no C wrappers for field access.
+transport_requested* = (handle: Ptr<()>) i32 { handle.to<NativeTransport>().read(
+    0
+).want }
+transport_armed* = (handle: Ptr<()>) i32 { handle.to<NativeTransport>().read(
+    0
+).armed }
+transport_mark_armed* = (handle: Ptr<()>, interest: i32) () {
+    pointer = handle.to<NativeTransport>();
+    transport ::= pointer.read(0);
+    transport.armed = interest;
+    pointer.write(0, transport);
 }

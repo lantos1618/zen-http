@@ -29,11 +29,11 @@ clang -O2 -g -fsanitize=undefined -fno-sanitize-recover=all build/chunked-test.c
 "$python" scripts/check-http2-request.py
 "$python" scripts/check-http2-network.py
 clang -O2 -g -fsanitize=undefined -fno-sanitize-recover=all \
-    -Isrc -I../zen-crypto/src -Ibuild/openssl/include build/h2-server.c \
+    -I"$stdlib/std/net" -Isrc -I../zen-crypto/src -Ibuild/openssl/include build/h2-server.c \
     build/openssl/lib/libssl.a build/openssl/lib/libcrypto.a -o build/zen-h2-sanitized-server
 "$python" scripts/check-http2-network.py --binary build/zen-h2-sanitized-server
 clang -O2 -g -fsanitize=undefined -fno-sanitize-recover=all \
-    -Isrc -I../zen-crypto/src -Ibuild/openssl/include -include src/reactor.h \
+    -I"$stdlib/std/net" -Isrc -I../zen-crypto/src -Ibuild/openssl/include -include src/reactor.h \
     build/zen.c build/openssl/lib/libssl.a build/openssl/lib/libcrypto.a \
     -o build/zen-sanitized-server
 "$python" tests/check.py --server zen-sanitized

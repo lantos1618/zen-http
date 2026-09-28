@@ -1,7 +1,8 @@
 Ptr, null_ptr = std.mem
+Readiness, Interest, WaitResult = std.net.readiness
 str_at = std.text
 ServerContext, TlsFault = tls
-transport_io, resume_read = http.transport
+transport_io, resume_read, transport_requested, transport_armed, transport_mark_armed = http.transport
 ChunkDecoder, ChunkError = http.chunked
 Native = c.bind("reactor.h", {
     zen_http_listen = (host: Ptr<u8>, port: u16, context: Ptr<()>) Ptr<()>
@@ -10,11 +11,9 @@ Native = c.bind("reactor.h", {
     zen_http_close = (transport: Ptr<()>) ()
     zen_http_seconds = () u64
     zen_http_date = () Ptr<u8>
-    zen_http_reactor_new = (listener: Ptr<()>) Ptr<()>
-    zen_http_reactor_free = (reactor: Ptr<()>) ()
-    zen_http_watch = (reactor: Ptr<()>, transport: Ptr<()>, slot: usize) i32
-    zen_http_wait_timeout = (reactor: Ptr<()>, timeout_ms: i32) i32
-    zen_http_ready_slot = (reactor: Ptr<()>, event: usize) usize
+    zen_http_listener_fd = (listener: Ptr<()>) i32
+    zen_http_fd = (transport: Ptr<()>) i32
+    POLLOUT: i32
     memmove = (dst: Ptr<u8>, src: Ptr<u8>, len: usize) Ptr<u8>
 })
 ServerError* = Listen | Poll | Invalid
@@ -337,17 +336,23 @@ serve* = (a: Alloc, options: Options, handler :: Handler) Res<(), AllocError
             (!c.transport.is_null()).then(() { c.close(); });
         });
     });
-    reactor = Native.zen_http_reactor_new(listener);
-    (!reactor.is_null()).ensure(ServerError.Poll).try();
-    @scope.defer(() { Native.zen_http_reactor_free(reactor); });
+    reactor ::= Readiness.open(a, SLOTS + 1).try(ServerError.Poll);
+    reactor.add(
+        Native.zen_http_listener_fd(listener),
+        SLOTS,
+        Interest.Read
+    ).try(ServerError.Poll);
     swept    ::= Native.zen_http_seconds();
     runnable ::= false;
     loop((h) {
         timeout: i32 = runnable.match({true => 0, false => 1000});
-        count        = Native.zen_http_wait_timeout(reactor, timeout);
-        (count >= 0).ensure(ServerError.Poll).try();
-        Range(0, count.to_i64().to_usize().ok_or(ServerError.Poll).try()).loop((event) {
-            slot = Native.zen_http_ready_slot(reactor, event);
+        // An interrupted wait returns to the scheduling/expiry loop without
+        // restarting its full timeout. This is HTTP policy, not std policy.
+        count = reactor.wait(timeout).try(ServerError.Poll).match({
+            Ready(n) => n, Interrupted => 0,
+        });
+        Range(0, count).loop((event) {
+            slot = reactor.ready_slot(event).try(ServerError.Poll);
             (slot == SLOTS).match({
                 true  => {
                     full     ::= true;
@@ -365,7 +370,16 @@ serve* = (a: Alloc, options: Options, handler :: Handler) Res<(), AllocError
                             c.used      = 0; c.header = 0; c.body = 0; c.pending = 0; c.sent = 0;
                             c.closing = false; c.active = Native.zen_http_seconds();
                             c.runnable = false; accepted = accepted + 1;
-                            (Native.zen_http_watch(reactor, transport, i) != 0).then(() { c.close(); });
+                            want     = transport_requested(transport);
+                            interest = (want == Native.POLLOUT).match({true => Interest.Write, false => Interest.Read});
+                            reactor.add(
+                                Native.zen_http_fd(transport),
+                                i,
+                                interest
+                            ).match({
+                                Ok(_)  => transport_mark_armed(transport, want),
+                                Err(_) => c.close(),
+                            });
                             connections.write(i, c);
                         });
                     });
@@ -398,7 +412,18 @@ serve* = (a: Alloc, options: Options, handler :: Handler) Res<(), AllocError
                     Err(_)    => c.close(),
                 });
                 (!c.transport.is_null()).then(() {
-                    (Native.zen_http_watch(reactor, c.transport, slot) != 0).then(() { c.close(); });
+                    want = transport_requested(c.transport);
+                    (want != transport_armed(c.transport)).then(() {
+                        interest = (want == Native.POLLOUT).match({true => Interest.Write, false => Interest.Read});
+                        reactor.modify(
+                            Native.zen_http_fd(c.transport),
+                            slot,
+                            interest
+                        ).match({
+                            Ok(_)  => transport_mark_armed(c.transport, want),
+                            Err(_) => c.close(),
+                        });
+                    });
                     (!c.transport.is_null() && c.runnable).then(
                         () { runnable = true; }
                     );

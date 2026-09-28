@@ -2,8 +2,8 @@
 import os, pathlib, subprocess, socket, ssl, threading, struct
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 os.chdir(ROOT)
-ENV = dict(os.environ, ZEN_STD=str(ROOT.parent / 'zen-actor-runtime/src'))
-COMPILER = str(ROOT.parent / 'zen-actor-runtime/zen')
+ENV = dict(os.environ, ZEN_STD=os.environ.get('ZEN_STD', str(ROOT.parent / 'zen-actor-runtime/src')))
+COMPILER = os.environ.get('ZEN_COMPILER', str(ROOT.parent / 'zen-actor-runtime/zen'))
 source = ROOT / 'build/source'
 def compile_test(path):
     entry = source / ('h2_' + path.name)

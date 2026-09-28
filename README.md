@@ -22,10 +22,12 @@ flowchart TD
   [examples/echo.zen](examples/echo.zen).
 - Zen owns parsing, framing, request/response buffers, dispatch, connection
   state, partial writes and keep-alive/pipelining. Readiness uses kqueue on macOS
-  and epoll on Linux. Both paths pass the current integration and UBSan suites.
+  and epoll on Linux through `std.net.readiness`; see the required compiler
+  revision and transitional H2 adapter in [STD_READINESS.md](docs/STD_READINESS.md).
   Zen owns socket read/write decisions and TLS retry/readiness transitions.
   Native adapters still handle socket creation, session creation/cleanup, OS
-  readiness registration and ABI details.
+  readiness ABI details. HTTP/1 readiness ownership and registration policy
+  are now Zen; the H2 compatibility adapter still retains some C policy.
 - An experimental HTTP/2 echo listener is available as `build/zen-h2-server`
   on loopback18082, with `--tls` enabling TLS1.3 and h2 ALPN. It has
   concurrent streams inside one active TCP connection; see its limits below.
