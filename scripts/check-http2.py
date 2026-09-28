@@ -74,7 +74,7 @@ for secure in (False, True):
         worker.join(35)
         assert not worker.is_alive()
         assert not errors, errors
-        assert result.returncode == 0, result.stderr + result.stdout
+        assert result.returncode == 0, f"client exit {result.returncode}: " + result.stderr + result.stdout
     print('HTTP/2 '+('TLS ALPN' if secure else 'prior knowledge')+' PASS',flush=True)
 
 # Trusted certificate but no h2 ALPN must never be accepted as HTTP/2.

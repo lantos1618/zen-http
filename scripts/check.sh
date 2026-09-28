@@ -23,6 +23,7 @@ ZEN_STD="$stdlib" "$compiler" build build/source --entry chunked_test.zen --emit
 clang -O2 -g -fsanitize=undefined -fno-sanitize-recover=all build/chunked-test.c -o build/chunked-test
 ./build/chunked-test
 "$python" tests/check.py
+"$python" tests/disconnect.py
 "$python" scripts/check-http2.py
 "$python" scripts/check-http2-server.py
 "$python" scripts/check-http2-request.py
@@ -36,3 +37,4 @@ clang -O2 -g -fsanitize=undefined -fno-sanitize-recover=all \
     build/zen.c build/openssl/lib/libssl.a build/openssl/lib/libcrypto.a \
     -o build/zen-sanitized-server
 "$python" tests/check.py --server zen-sanitized
+"$python" tests/disconnect.py --server zen-sanitized
