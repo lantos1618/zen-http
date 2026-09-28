@@ -33,6 +33,25 @@ class BenchmarkTests(unittest.TestCase):
             with self.subTest(args=args), contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 run.arguments(args)
 
+    def test_affinity_contract(self):
+        with mock.patch.object(run.os, 'sched_getaffinity', return_value={0,1,2}, create=True):
+            args=run.arguments(['--server-cpu','0','--client-cpus','1','2'])
+            self.assertEqual(args.client_cpus,[1,2])
+            for extra in (['--server-cpu','0'],['--server-cpu','0','--client-cpus','0'],['--server-cpu','3','--client-cpus','1'],['--server-cpu','0','--client-cpus','1','1']):
+                with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                    run.arguments(extra)
+
+    def test_linux_resource_accounting(self):
+        fields=['S']+['0']*10+['120','30']
+        with mock.patch.object(run.sys,'platform','linux'), mock.patch.object(run.Path,'read_text',side_effect=['42 (name with ) spaces) '+ ' '.join(fields), 'Name: server\nVmHWM: 8192 kB\n']), mock.patch.object(run.os,'sysconf',return_value=100), mock.patch.object(run.os,'sched_getaffinity',return_value={2},create=True):
+            self.assertEqual(run.linux_process_stats(42), {'cpu_s_including_startup_warmup':1.5,'peak_rss_kib_including_startup_warmup':8192,'observed_cpu_affinity':[2]})
+        data=document()
+        for row in data['rows']:
+            row['server_resources']={'cpu_s_including_startup_warmup':1.5,'peak_rss_kib_including_startup_warmup':8192}
+        self.assertIn('1.500 | 8,192',report.render(data))
+        data['rows'][0]['status']='failed'
+        self.assertNotIn('1.500 | 8,192',report.render(data))
+
     def test_invalid_metrics(self):
         expected = dict(result(), seconds=2)
         run.validate_result(result(), expected)

@@ -66,7 +66,20 @@ def render(document):
         def spread(values, decimals):
             return f'{statistics.median(values):,.{decimals}f} [{min(values):,.{decimals}f}–{max(values):,.{decimals}f}]'
         lines.append(prefix + f' {spread(rates[0], 0)} | {spread(rates[1], 0)} | {spread(ratios, 3)} | {tails[0]:.1f} | {tails[1]:.1f} | complete |')
-    lines += ['', 'These closed-loop measurements include client overhead and use one outstanding request per connection. They do not measure open-loop tail latency, server CPU/RSS, or handshake throughput.']
+    resource_rows = [r for r in rows if r.get('status', 'ok') == 'ok' and 'server_resources' in r]
+    if resource_rows:
+        lines += ['', 'Linux server resources below are trial medians over process lifetime through client completion, including startup and warmup. They are not timed-phase-only CPU or instantaneous RSS.', '',
+                  '| Protocol | Connections | Body bytes | Server | CPU seconds | Peak RSS KiB |',
+                  '|---|---:|---:|---|---:|---:|']
+        for cell in cells:
+            for name in ('zen', 'uws'):
+                group = [r['server_resources'] for r in resource_rows if (r['tls'],r['connections'],r['body']) == cell and r['server'] == name]
+                paired_complete = all(indexed.get((*cell,t,n),{}).get('status') == 'ok' for t in range(count) for n in ('zen','uws'))
+                if len(group) == count and paired_complete:
+                    cpu = statistics.median(r['cpu_s_including_startup_warmup'] for r in group)
+                    rss = statistics.median(r['peak_rss_kib_including_startup_warmup'] for r in group)
+                    lines.append(f'| {"TLS 1.3" if cell[0] else "HTTP"} | {cell[1]} | {cell[2]} | {name} | {cpu:.3f} | {rss:,.0f} |')
+    lines += ['', 'These closed-loop measurements include client overhead and use one outstanding request per connection. They do not measure open-loop tail latency or handshake throughput. Server resource metrics, when available, include startup and warmup.']
     return '\n'.join(lines) + '\n'
 
 

@@ -12,7 +12,7 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 
 @contextlib.contextmanager
-def server(name, tls=False):
+def server(name, tls=False, command_prefix=()):
     env = dict(os.environ)
     env.pop('BENCH_TLS', None)
     args = [str(ROOT / 'build' / (name + '-server'))]
@@ -24,7 +24,7 @@ def server(name, tls=False):
         probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         probe.bind(('127.0.0.1', 18080))
     with open(ROOT / 'build' / (name + '-server.log'), 'w') as log:
-        process = subprocess.Popen(args, cwd=ROOT, env=env, stdout=log, stderr=log)
+        process = subprocess.Popen([*command_prefix, *args], cwd=ROOT, env=env, stdout=log, stderr=log)
         try:
             for _ in range(1000):
                 if process.poll() is not None: raise RuntimeError(f'{name} exited: {process.returncode}; see log')

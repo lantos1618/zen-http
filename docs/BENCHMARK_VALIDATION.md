@@ -2,7 +2,7 @@
 
 The harness measures a fixed-length POST echo over persistent HTTP/1.1 connections, with one outstanding request per connection. TLS trials verify the local certificate and require TLS 1.3 with AES-128-GCM. Each connection warms up for one second before a common measurement start. The final in-flight request may finish after the requested duration; elapsed time includes that drain through the last worker completion. Client aggregation/sorting time is excluded from throughput elapsed time.
 
-This is a closed-loop, same-host test. It includes client overhead and cannot establish open-loop latency under a fixed offered load, remote-network behavior, HTTP/2 performance, or handshake throughput. The client records every successful exchange latency; this consumes memory and adds measurement overhead. Its CPU metric includes setup, warmup, measurement and aggregation through the accounting call. **It is not server CPU usage.** Server CPU, RSS and affinity are not measured by this harness.
+This is a closed-loop, same-host test. It includes client overhead and cannot establish open-loop latency under a fixed offered load, remote-network behavior, HTTP/2 performance, or handshake throughput. The client records every successful exchange latency; this consumes memory and adds measurement overhead. Its CPU metric includes setup, warmup, measurement and aggregation through the accounting call. **It is not server CPU usage.** On Linux, the runner records server CPU time and peak RSS over its lifetime through client completion, including startup and warmup. Optional disjoint CPU affinity is checked for the server; no claim of physical-core or host isolation follows.
 
 ## Running and retaining evidence
 
@@ -31,3 +31,12 @@ GOCACHE="$PWD/build/go-test-cache" ../zen-bench/build/toolchains/go/bin/go test 
 Python tests exercise invalid inputs/metrics, pairing, missing entire cells, duplicate identifiers, failure/interrupt persistence and overwrite protection. Go tests exercise valid responses and negative controls for wrong bodies, status, duplicate/signed/missing content lengths, transfer encoding, truncated bodies and excessive/malformed headers. They use in-memory input, not loopback servers.
 
 These changes alter both timing accounting and client validation overhead. Earlier results remain historical evidence for the earlier harness and binaries; **fresh matched runs are required before making new performance claims**. No new performance measurement is implied by passing these tests.
+
+
+Linux placement example: append `--server-cpu 2 --client-cpus 4 5 6 7`.
+Both arguments are required together; CPUs must be allowed, distinct, and
+nonoverlapping. `taskset` is required. Raw rows record observed server affinity,
+cumulative server user+system CPU seconds from /proc, and lifetime VmHWM KiB.
+Reading occurs after the load generator exits and before terminating the server.
+These are not measurement-window-only resource figures. Other host workloads
+and virtual CPU scheduling can still affect results.

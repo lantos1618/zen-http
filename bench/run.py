@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import math
+import os
 from pathlib import Path
 import platform
 import subprocess
@@ -22,6 +23,8 @@ def arguments(argv=None):
     p.add_argument('--sizes', type=int, nargs='+', default=[32, 64, 256, 512, 16384])
     p.add_argument('--connections', type=int, nargs='+', default=[1, 32])
     p.add_argument('--output', default='build/results.json')
+    p.add_argument('--server-cpu', type=int)
+    p.add_argument('--client-cpus', type=int, nargs='+')
     args = p.parse_args(argv)
     if not 1 <= args.trials <= 1000:
         p.error('trials must be between 1 and 1000')
@@ -33,6 +36,16 @@ def arguments(argv=None):
         p.error('connections must be between 1 and 200')
     if len(set(args.sizes)) != len(args.sizes) or len(set(args.connections)) != len(args.connections):
         p.error('duplicate sizes or connections would duplicate trial identifiers')
+    if (args.server_cpu is None) != (args.client_cpus is None):
+        p.error('supply both server-cpu and client-cpus')
+    if args.server_cpu is not None:
+        if not hasattr(os, 'sched_getaffinity'):
+            p.error('CPU placement requires Linux sched_getaffinity and taskset')
+        allowed = os.sched_getaffinity(0)
+        if args.server_cpu not in allowed or any(cpu not in allowed for cpu in args.client_cpus):
+            p.error('requested CPU is outside the allowed affinity set')
+        if args.server_cpu in args.client_cpus or len(set(args.client_cpus)) != len(args.client_cpus):
+            p.error('server and client CPUs must be distinct and client CPUs unique')
     return args
 
 
@@ -62,6 +75,21 @@ def validate_result(data, expected):
         raise ValueError('client measurement ended too early')
 
 
+def linux_process_stats(pid):
+    """Cumulative server CPU and lifetime peak RSS, including startup/warmup."""
+    if sys.platform != 'linux':
+        return None
+    stat = Path(f'/proc/{pid}/stat').read_text()
+    # comm can contain spaces or parentheses; fields after its final ')' start at3.
+    fields = stat[stat.rfind(')') + 2:].split()
+    ticks = int(fields[11]) + int(fields[12])
+    status = Path(f'/proc/{pid}/status').read_text().splitlines()
+    peak = next(int(line.split()[1]) for line in status if line.startswith('VmHWM:'))
+    return {'cpu_s_including_startup_warmup': ticks / os.sysconf('SC_CLK_TCK'),
+            'peak_rss_kib_including_startup_warmup': peak,
+            'observed_cpu_affinity': sorted(os.sched_getaffinity(pid))}
+
+
 def main(argv=None):
     args = arguments(argv)
     path = ROOT / args.output
@@ -75,7 +103,8 @@ def main(argv=None):
         'environment': {'platform': platform.platform(), 'machine': platform.machine(),
                         'python': platform.python_version()},
         'config': {'trials': args.trials, 'seconds': args.seconds,
-                   'sizes': args.sizes, 'connections': args.connections, 'tls': [False, True]},
+                   'sizes': args.sizes, 'connections': args.connections, 'tls': [False, True],
+                   'server_cpu': args.server_cpu, 'client_cpus': args.client_cpus},
         'binaries_sha256': {}, 'rows': [],
     }
     checkpoint(path, document)
@@ -98,10 +127,14 @@ def main(argv=None):
                                        '-connections', str(connections), '-seconds', str(args.seconds)]
                             if encrypted:
                                 command += ['-tls']
+                            server_prefix = []
+                            if args.server_cpu is not None:
+                                server_prefix = ['taskset', '-c', str(args.server_cpu)]
+                                command = ['taskset', '-c', ','.join(map(str,args.client_cpus)), *command]
                             log = ROOT / 'build' / (name + '-server.log')
                             previous_log = log.stat() if log.exists() else None
                             try:
-                                with server(name, encrypted):
+                                with server(name, encrypted, command_prefix=server_prefix) as process:
                                     result = subprocess.run(command, cwd=ROOT, capture_output=True,
                                                             text=True, timeout=args.seconds + 20)
                                     row.update(returncode=result.returncode, stdout=result.stdout, stderr=result.stderr)
@@ -109,6 +142,13 @@ def main(argv=None):
                                         raise RuntimeError(f'load client exited {result.returncode}')
                                     data = json.loads(result.stdout)
                                     validate_result(data, row)
+                                    if process.poll() is not None:
+                                        raise RuntimeError('server exited during trial')
+                                    stats = linux_process_stats(process.pid)
+                                    if stats is not None:
+                                        row['server_resources'] = stats
+                                        if args.server_cpu is not None and stats['observed_cpu_affinity'] != [args.server_cpu]:
+                                            raise RuntimeError('server affinity changed during trial')
                                 # Only accept metrics after both client validation and server cleanup.
                                 row.update({k: data[k] for k in ('requests', 'elapsed_s', 'rps', 'p50_us', 'p95_us', 'p99_us')})
                                 if 'client_cpu_s_including_warmup' in data:
