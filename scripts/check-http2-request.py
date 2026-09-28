@@ -17,8 +17,10 @@ for name in ['http2_request.zen', 'http2_hpack.zen', 'http2_types.zen']:
     if not path.exists():
         path.symlink_to(ROOT / 'src/http' / name)
 tls = SOURCE / 'tls.zen'
+if tls.is_symlink():
+    tls.unlink()
 if not tls.exists():
-    tls.symlink_to(ROOT.parent / 'zen-crypto/src/tls.zen')
+    tls.symlink_to(ROOT.parent / 'zen-openssl/src/tls.zen')
 for test in sorted((ROOT / 'tests/http2').glob('request*.zen')):
     entry = SOURCE / test.name
     if entry.is_symlink():

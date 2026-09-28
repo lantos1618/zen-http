@@ -48,7 +48,7 @@ implementation description.
 
 
 TLS selection logic is a Zen native callback installed through a typed ABI shim
-in zen-crypto. A client offering ALPN without h2 fails the handshake. A client
+in zen-openssl. A client offering ALPN without h2 fails the handshake. A client
 omitting ALPN can complete TLS but is closed before HTTP/2 responses are sent.
 The local certificate/key paths are fixed test fixtures. This is not a
 configurable public TLS server API.

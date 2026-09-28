@@ -5,6 +5,11 @@ The standard library should own generally useful allocation, bytes, sockets,
 clocks and readiness primitives. Publishing a package is not a reason to copy
 its implementation back into `std`: two independently edited copies drift.
 
+The current package split keeps native Zen algorithms in `zen-crypto`, OpenSSL
+TLS integration in `zen-openssl`, and libsodium bindings in `zen-sodium`.
+zen-http depends on zen-openssl for TLS. The source inventory below is historical
+and retains its original repository names and revisions.
+
 ## What is actually Zen
 
 At HTTP commit `1463e2d` and crypto commit `3c041cd`, physical lines under `src`

@@ -2,7 +2,7 @@ Builder, BuildError = std.build
 build = (b :: Builder) Res<(), BuildError> {
     tls  = b.lib(
         "tls",
-        {src: Path("../zen-crypto/src/tls.zen"), libs: ["ssl", "crypto"], paths: ["build/openssl/lib"]}
+        {src: Path("../zen-openssl/src/tls.zen"), libs: ["ssl", "crypto"], paths: ["build/openssl/lib"]}
     ).try();
     http = b.lib(
         "http",

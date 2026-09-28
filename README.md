@@ -1,7 +1,8 @@
 # zen-http
 
-Standalone HTTP library for Zen. HTTP belongs here; TLS and cryptographic
-backends belong in the sibling `zen-crypto` package. Standard-library allocation,
+Standalone HTTP library for Zen. HTTP belongs here; OpenSSL-backed TLS belongs
+in the sibling `zen-openssl` package. `zen-crypto` contains native Zen algorithms
+and `zen-sodium` separately exposes libsodium bindings. Standard-library allocation,
 bytes and OS socket primitives remain underneath both. The existing
 `std.net.http`, `std.net.http2` and `std.net.tls` modules are still present for
 existing applications; this package does not silently redirect `Env.http`.
@@ -9,10 +10,10 @@ existing applications; this package does not silently redirect `Env.http`.
 ```mermaid
 flowchart TD
     app[Zen applications] --> http[zen-http: HTTP client and server]
-    http --> crypto[zen-crypto: TLS and cryptography]
+    http --> tls[zen-openssl: TLS policy and OpenSSL bindings]
     http --> std[std: memory, bytes and OS primitives]
-    crypto --> std
-    crypto --> native[OpenSSL and libsodium backends]
+    tls --> std
+    tls --> native[OpenSSL]
 ```
 
 ## Implemented
@@ -32,7 +33,7 @@ flowchart TD
   on loopback18082, with `--tls` enabling TLS1.3 and h2 ALPN. It has
   concurrent streams inside one active TCP connection; see its limits below.
 - `HttpClient.post` / `post_into` and response decoding were extracted from
-  the current standard-library implementation. They import `zen-crypto`'s
+  the current standard-library implementation. They import `zen-openssl`'s
   `tls` module rather than `std.net.tls`.
 
 Request strings are borrowed for the synchronous handler call. Do not retain
@@ -64,11 +65,11 @@ and behavior checks are in place. `Env.http` has not yet been redirected.
 
 ## Build and verify
 
-The build expects sibling compiler and crypto checkouts. From their parent directory:
+The build expects sibling compiler and OpenSSL package checkouts. From their parent directory:
 
 ```sh
 git clone https://github.com/lantos1618/zen.git zen-actor-runtime
-git clone https://github.com/lantos1618/zen-crypto.git
+git clone https://github.com/lantos1618/zen-openssl.git
 git clone https://github.com/lantos1618/zen-http.git
 ```
 
@@ -94,7 +95,7 @@ The normal package target also builds with:
 
 ```sh
 ZEN_STD=../zen-actor-runtime/src \
-CPATH="$PWD/src:$PWD/../zen-crypto/src:$PWD/build/openssl/include" \
+CPATH="$PWD/src:$PWD/../zen-openssl/src:$PWD/../zen-actor-runtime/src/std/net:$PWD/build/openssl/include" \
 ../zen-actor-runtime/zen build echo
 ```
 
@@ -142,7 +143,7 @@ certificate. The complete limits and next implementation work are in
 
 `H2Client` is now exported from `http`. Its frame codec, HPACK/Huffman decoder,
 SETTINGS handling, flow-control accounting and response processing are Zen
-source in this package. It uses `zen-crypto` for verified TLS with mandatory
+source in this package. It uses `zen-openssl` for verified TLS with mandatory
 `h2` ALPN, or prior-knowledge plaintext HTTP/2. It supports sequential POST
 streams on a persistent connection, buffered responses, sink output and actor
 chunk delivery. It currently allows **one active request per connection**;
@@ -157,7 +158,7 @@ peer over plaintext and TLS, fragmented responses, and rejection without h2
 ALPN. This is a bounded interoperability check, not full HTTP/2 conformance.
 
 Server TLS policy and context lifetime now also live in Zen (`ServerContext`
-in `zen-crypto`). OpenSSL supplies the cryptographic implementation. The remaining
+in `zen-openssl`). OpenSSL supplies the cryptographic implementation. The remaining
 C adapters cover socket setup/readiness, session creation/cleanup, and native
 ABI details. Socket read/write policy and nonblocking TLS retry decisions are Zen. Reducing those adapters further is tracked work; this is not yet an
 entirely Zen transport. Existing standard-library APIs are retained for migration.

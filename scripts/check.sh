@@ -15,7 +15,7 @@ compiler=${ZEN_COMPILER:-../zen-actor-runtime/zen}
 stdlib=${ZEN_STD:-../zen-actor-runtime/src}
 ln -sfn "$PWD/tests/transport.zen" build/source/transport_test.zen
 ZEN_STD="$stdlib" "$compiler" build build/source --entry transport_test.zen --emit-c -o build/transport-test.c
-clang -O2 -g -fsanitize=undefined -fno-sanitize-recover=all -Isrc -I../zen-crypto/src -Ibuild/openssl/include \
+clang -O2 -g -fsanitize=undefined -fno-sanitize-recover=all -Isrc -I../zen-openssl/src -Ibuild/openssl/include \
     build/transport-test.c build/openssl/lib/libssl.a build/openssl/lib/libcrypto.a -o build/transport-test
 ./build/transport-test
 ln -sfn "$PWD/tests/chunked.zen" build/source/chunked_test.zen
@@ -29,11 +29,11 @@ clang -O2 -g -fsanitize=undefined -fno-sanitize-recover=all build/chunked-test.c
 "$python" scripts/check-http2-request.py
 "$python" scripts/check-http2-network.py
 clang -O2 -g -fsanitize=undefined -fno-sanitize-recover=all \
-    -I"$stdlib/std/net" -Isrc -I../zen-crypto/src -Ibuild/openssl/include build/h2-server.c \
+    -I"$stdlib/std/net" -Isrc -I../zen-openssl/src -Ibuild/openssl/include build/h2-server.c \
     build/openssl/lib/libssl.a build/openssl/lib/libcrypto.a -o build/zen-h2-sanitized-server
 "$python" scripts/check-http2-network.py --binary build/zen-h2-sanitized-server
 clang -O2 -g -fsanitize=undefined -fno-sanitize-recover=all \
-    -I"$stdlib/std/net" -Isrc -I../zen-crypto/src -Ibuild/openssl/include -include src/reactor.h \
+    -I"$stdlib/std/net" -Isrc -I../zen-openssl/src -Ibuild/openssl/include -include src/reactor.h \
     build/zen.c build/openssl/lib/libssl.a build/openssl/lib/libcrypto.a \
     -o build/zen-sanitized-server
 "$python" tests/check.py --server zen-sanitized

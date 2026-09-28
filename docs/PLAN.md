@@ -1,8 +1,8 @@
 # Package boundary and performance work
 
 `zen-http` owns HTTP messages, parsing, framing, routing, connection policy and
-protocol-specific client/server behavior. `zen-crypto` owns TLS policy, sessions,
-certificate verification and vetted primitive backends. `std` retains generic
+protocol-specific client/server behavior. `zen-openssl` owns TLS policy, sessions,
+certificate verification and OpenSSL integration. `std` retains generic
 memory, byte, numeric and OS facilities. Keep existing standard-library consumers
 working while replacing their HTTP/TLS imports explicitly in a later migration.
 HTTP/2 must migrate with its framing, HPACK, flow control and actor tests, not
@@ -100,3 +100,7 @@ used an isolated checkout of the published compiler and package revisions.
 This validates the documented bounded cases, not full HTTP/2 conformance,
 production readiness, cryptographic implementation correctness or ASan safety.
 See RESULTS.md for measured performance and exact build evidence.
+
+TLS extraction now lives in the separate `zen-openssl` backend package. Earlier
+checkpoint references to zen-crypto describe the layout at those revisions.
+Native Zen algorithms remain in zen-crypto; libsodium bindings live in zen-sodium.

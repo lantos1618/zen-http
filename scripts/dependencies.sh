@@ -13,4 +13,4 @@ if [ ! -d build/uWebSockets/.git ]; then
 fi
 test "$(git -C build/uWebSockets rev-parse HEAD)" = "$commit"
 git -C build/uWebSockets submodule update --init --depth 1 uSockets
-sh ../zen-crypto/scripts/build-openssl.sh "$root/build"
+sh ../zen-openssl/scripts/build-openssl.sh "$root/build"

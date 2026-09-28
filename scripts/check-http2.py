@@ -11,7 +11,7 @@ def compile_test(path):
     entry.symlink_to(path.resolve())
     output = ROOT / 'build' / ('h2_' + path.stem)
     subprocess.run([COMPILER, 'build', str(source), '--entry', entry.name, '--emit-c', '-o', str(output)+'.c'], env=ENV, check=True)
-    subprocess.run(['clang', '-O2', '-I../zen-crypto/src', '-Ibuild/openssl/include', str(output)+'.c', 'build/openssl/lib/libssl.a', 'build/openssl/lib/libcrypto.a', '-o', str(output)], check=True)
+    subprocess.run(['clang', '-O2', '-I../zen-openssl/src', '-Ibuild/openssl/include', str(output)+'.c', 'build/openssl/lib/libssl.a', 'build/openssl/lib/libcrypto.a', '-o', str(output)], check=True)
     return output
 for path in sorted((ROOT / 'tests/http2').glob('*.zen')):
     executable = compile_test(path)
