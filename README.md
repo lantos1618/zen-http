@@ -51,6 +51,15 @@ chunk extensions and many trailers remain unsupported. Expect, upgrades,
 streaming handlers, graceful shutdown and HTTP/3 are not implemented. The
 HTTP/2 endpoint is a separate experimental server. This is an experimental package, not a production-ready HTTP stack.
 
+## Native code and standard-library migration
+
+See [the audited boundary and migration gates](docs/NATIVE_BOUNDARY.md). HTTP
+protocol logic is Zen; OS adapters and vetted cryptographic backends remain
+native dependencies. The public packages and old std clients currently overlap.
+The intended migration keeps one canonical protocol implementation and preserves
+existing std APIs through compatibility facades after dependency/build support
+and behavior checks are in place. `Env.http` has not yet been redirected.
+
 ## Build and verify
 
 The build expects sibling compiler and crypto checkouts. From their parent directory:
