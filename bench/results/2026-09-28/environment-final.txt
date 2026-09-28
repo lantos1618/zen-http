@@ -1,0 +1,36 @@
+Darwin Lyndons-MacBook-Pro.local 25.6.0 Darwin Kernel Version 25.6.0: Fri Jul 31 19:18:48 PDT 2026; root:xnu-12377.161.14~5/RELEASE_ARM64_T6020 arm64
+Apple clang version 17.0.0 (clang-1700.6.4.2)
+Target: arm64-apple-darwin25.6.0
+Thread model: posix
+InstalledDir: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin
+go version go1.27.1 darwin/arm64
+OpenSSL 3.5.4 30 Sep 2025 (Library: OpenSSL 3.5.4 30 Sep 2025)
+4e7578d175fcb6d2f5b3ae7ad7b13ce14f4309d8
+86097c490263ab662d62e8e7b541390bdec7d149
+9002dd623593137bff217d39a06f5ac985ad5852803320b7421e5c0c0c3be5b2  /Users/lyndon/zen-dev/zen-http/../zen-actor-runtime/zen
+c8cf5708a9efcad570622239a1ea10d574782b9f04106c05fffdddc7d5a371f0  src/http/client.zen
+eabd62f190d8611692ed70ea3ddc43bbaf93c7763c2dcc9a45a2065363cacc8b  src/http/client_decode.zen
+63fd8d73eb279149ac8f8e3e819068881137837a628c029dce3b8c5c824c58b2  src/http/client_types.zen
+a7684fa239c61f46e2b1322a2bae71fe77436145d96fa419e1e2933da4b42603  src/http/http.zen
+925a7507be94e944ce155e6555a53f6eccd2cfd204a0845ac2fd41264fdb7e33  src/http/server.zen
+f009361e8ba96fc7aaab462231724bde916f2d509ad639a59199a0031a7d28a6  src/transport.h
+f071f16b6129684dd2baf5d563e23142cd901b5e153d5b9381149af92641f930  src/reactor.h
+4ae06bdea629adebe2950fe585ca7b4f21390a4e686c89fdff57fbc81c416aab  ../zen-crypto/src/tls.zen
+c105cf63d360c3f72678effd89716c9fe5b862c27b5a94f6c9c56d9c1eb2cfd5  ../zen-crypto/src/zen_tls.h
+e79acf43e414a76023d00e11303afdbcbf0faae2644403068afeb7803e3dbf18  bench/uws.cpp
+ab5710b0b9e7fcf6c91442343b2ad381eef935ea4d4103ad8a51abd4a347e6c5  bench/load.go
+c2a2b015c778ab81148f66dd9aac209ce991c2b61bf76b8477d25109fb60baa7  build/zen-server
+3dd7cd10889ab90795cedcf1ada5899805baa9282d37f3fabab3bf974b0c1361  build/uws-server
+9599aab008cdbc9e309a9cf53657a3213c569841a7f91f99df94953ea4a58475  build/load
+
+Final benchmark command:
+python3 bench/run.py --sizes 64 512 16384 --connections 1 32 --trials 3 --seconds 2 --output build/results-readahead.json
+
+Additional artifact SHA256:
+a636e2e91c4ee102264133659150b2f3435b9f1819826c5c078d3c0d89cc847d  build/zen.c
+48ed87927097ebf917b0af6da03a73a2803803bf191214597305c9263749c7fa  build/client.c
+d9d301bbb81b70a233a323daa806f5837e06b41a026514bc4ea41b2b35486318  build/openssl/lib/libssl.a
+0acecf3dc03c2166747fdb5899cda113d340112bf3245f1274303a5854a9a053  build/openssl/lib/libcrypto.a
+78ff79b10bd187dbef49011faa8e0275dd918bad41936c05ddffc4454e27b4c4  build/cert.pem
+8ff6af2f06127be907250ffd79f6285bb4ef2fa58102c42e70c68c2bb824cfdd  bench/run.py
+fbd1e5f54ffe66b10d9846bada56efe21e1b256e7e5e8b17123c4e4f039c8277  tests/check.py

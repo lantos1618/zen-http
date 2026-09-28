@@ -1,0 +1,52 @@
+H2StateError, h2_server_state = http.http2_server_state
+rejected = (
+    result : Res<(), H2StateError>
+) bool { result.match({ Ok(_) => false, Err(_) => true }) }
+main = (env: Env) Res<(), H2StateError> {
+    s ::= h2_server_state();
+    s.open(1, false).try();
+    s.open(3, false).try();
+    s.send_data(1, 65535, false).try();
+    (s.send_window() == 0).ensure(H2StateError.Protocol).try();
+    rejected(s.send_data(3, 1, false)).ensure(H2StateError.Protocol).try();
+    (s.inspect(3).try().send_window == 65535).ensure(H2StateError.Protocol).try();
+    s.update_connection(1).try();
+    rejected(s.send_data(1, 1, false)).ensure(H2StateError.Protocol).try();
+    (s.send_window() == 1).ensure(H2StateError.Protocol).try();
+    s.send_data(3, 1, false).try();
+    s.update_connection(2147483647).try();
+    rejected(s.update_connection(1)).ensure(H2StateError.Protocol).try();
+    (s.send_window() == 2147483647).ensure(H2StateError.Protocol).try();
+    rejected(s.send_data(3, -1, false)).ensure(H2StateError.Protocol).try();
+    rejected(s.receive_data(3, -1, false)).ensure(H2StateError.Protocol).try();
+    println("independent send limits and no partial reservation pass");
+
+    // An overflow on the second occupied slot must not update the first.
+    s.set_initial_window(0).try();
+    s.update_stream(3, 2147483647).try();
+    s.update_stream(3, 1).try();
+    before = s.inspect(1).try().send_window;
+    rejected(s.set_initial_window(65535)).ensure(H2StateError.Protocol).try();
+    (s.inspect(1).try().send_window == before).ensure(H2StateError.Protocol).try();
+    s.open(5, false).try();
+    (s.inspect(5).try().send_window == 0).ensure(H2StateError.Protocol).try();
+    rejected(s.set_initial_window(-1)).ensure(H2StateError.Protocol).try();
+    rejected(s.set_initial_window(2147483648)).ensure(H2StateError.Protocol).try();
+    // Empty DATA with END_STREAM is permitted with a negative stream window.
+    s.send_data(1, 0, true).try();
+    (s.inspect(1).try().local_closed).ensure(H2StateError.Protocol).try();
+    println("settings rollback and empty DATA at negative window pass");
+
+    s.receive_data(3, 10, false).try();
+    s.credit_connection(10).try();
+    rejected(s.credit_connection(1)).ensure(H2StateError.Protocol).try();
+    (s.inspect(3).try().receive_window == 65525).ensure(H2StateError.Protocol).try();
+    s.credit_stream(3, 10).try();
+    rejected(s.credit_stream(3, 1)).ensure(H2StateError.Protocol).try();
+    (s.receive_window() == 65535).ensure(H2StateError.Protocol).try();
+    rejected(s.release(3)).ensure(H2StateError.Protocol).try();
+    s.reset(3).try();
+    rejected(s.credit_stream(3, 1)).ensure(H2StateError.Protocol).try();
+    println("credit scopes and live-stream release rejection pass");
+    Ok(())
+}

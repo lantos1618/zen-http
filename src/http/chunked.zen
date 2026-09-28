@@ -1,0 +1,166 @@
+Ptr, null_ptr = std.mem
+str_at = std.text
+ChunkError* = Invalid | TooLarge
+// Cursor positions refer to the original wire. Decoded bytes are copied behind
+// that cursor, preserving both the headers and any pipelined next request.
+ChunkDecoder* = {
+    cursor* :: usize,
+    scan :: usize,
+    decoded* :: usize,
+    remaining :: usize,
+    phase :: usize,
+    trailers :: usize,
+    fields :: usize,
+
+    start* = (header: usize) ChunkDecoder {
+        ChunkDecoder(
+            cursor: header,
+            scan: header,
+            decoded: 0,
+            remaining: 0,
+            phase: 0,
+            trailers: 0,
+            fields: 0
+        )
+    }
+
+    advance* = (self :: @Self, input: Ptr<u8>, used: usize, header: usize) Res<bool, ChunkError> {
+        loop((h) {
+            (self.phase == 4).then(() { h.break(); });
+            (self.phase == 1).match({
+                true  => {
+                    available = used - self.cursor;
+                    count     = (available < self.remaining).match({true => available, false => self.remaining});
+                    // Forward copying is safe because destination <= source.
+                    Range(0, count).loop((i) {
+                        input.write(
+                            header + self.decoded + i,
+                            input.read(self.cursor + i)
+                        );
+                    });
+                    self.cursor    = self.cursor + count;
+                    self.decoded   = self.decoded + count;
+                    self.remaining = self.remaining - count;
+                    (self.remaining > 0).then(() { h.break(); });
+                    self.phase = 2;
+                },
+                false => {
+                    (self.phase == 2).match({
+                        true  => {
+                            (used - self.cursor < 2).then(() { h.break(); });
+                            (input.read(self.cursor) == 13 && input.read(self.cursor + 1) == 10)
+                                .ensure(ChunkError.Invalid).try();
+                            self.cursor = self.cursor + 2;
+                            self.scan   = self.cursor;
+                            self.phase  = 0;
+                        },
+                        false => {
+                            // Remember the last inspected byte across fragmentation.
+                            found ::= false;
+                            loop(self.scan + 1 < used, (line_loop) {
+                                (self.scan - self.cursor <= 1024).ensure(
+                                    ChunkError.Invalid
+                                ).try();
+                                (input.read(self.scan) == 13 && input.read(self.scan + 1) == 10).then(() {
+                                    found = true; line_loop.break();
+                                });
+                                self.scan = self.scan + 1;
+                            });
+                            (self.scan - self.cursor <= 1024).ensure(
+                                ChunkError.Invalid
+                            ).try();
+                            (!found).then(() { h.break(); });
+                            line        = str_at(
+                                input.offset(self.cursor),
+                                self.scan - self.cursor
+                            );
+                            self.cursor = self.scan + 2;
+                            self.scan   = self.cursor;
+                            (self.phase == 0).match({
+                                true  => {
+                                    // Extensions are deliberately rejected in this bounded subset.
+                                    (line.len > 0 && line.len <= 16).ensure(
+                                        ChunkError.Invalid
+                                    ).try();
+                                    size ::= 0;
+                                    line.loop((ch) {
+                                        digit = (ch >= '0' && ch <= '9').match({
+                                            true  => (ch - '0').to_usize(),
+                                            false => (ch >= 'a' && ch <= 'f').match({
+                                                true  => (ch - 'a').to_usize() + 10,
+                                                false => {
+                                                    (ch >= 'A' && ch <= 'F').ensure(
+                                                        ChunkError.Invalid
+                                                    ).try();
+                                                    (ch - 'A').to_usize() + 10
+                                                },
+                                            }),
+                                        });
+                                        (size <= 4096).ensure(
+                                            ChunkError.Invalid
+                                        ).try();
+                                        size = size * 16 + digit;
+                                        (size <= 65536 - self.decoded).ensure(
+                                            ChunkError.Invalid
+                                        ).try();
+                                    });
+                                    self.remaining = size;
+                                    self.phase     = (size == 0).match({true => 3, false => 1});
+                                },
+                                false => {
+                                    self.trailers = self.trailers + line.len + 2;
+                                    (self.trailers <= 8192).ensure(
+                                        ChunkError.Invalid
+                                    ).try();
+                                    (line.len == 0).match({
+                                        true  => { self.phase = 4; },
+                                        false => {
+                                            self.fields = self.fields + 1;
+                                            (self.fields <= 64).ensure(
+                                                ChunkError.Invalid
+                                            ).try();
+                                            pair = line.split_once(':').ok_or(ChunkError.Invalid).try();
+                                            (pair.before.len > 0).ensure(
+                                                ChunkError.Invalid
+                                            ).try();
+                                            pair.before.loop((ch) {
+                                                ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')
+                                                    || (ch >= '0' && ch <= '9') || ch == '!' || ch == '#'
+                                                    || ch == '$' || ch == '%' || ch == '&' || ch == 39
+                                                    || ch == '*' || ch == '+' || ch == '-' || ch == '.'
+                                                    || ch == '^' || ch == '_' || ch == 96 || ch == '|' || ch == '~')
+                                                    .ensure(
+                                                        ChunkError.Invalid
+                                                    ).try();
+                                            });
+                                            pair.after.loop((ch) {
+                                                (ch == 9 || (ch >= 32 && ch != 127)).ensure(
+                                                    ChunkError.Invalid
+                                                ).try();
+                                            });
+                                            // Only explicitly harmless metadata is accepted; no routing,
+                                            // framing, authentication or connection fields can hide here.
+                                            (pair.before.eq_ignore_case(
+                                                "digest"
+                                            )
+                                                || pair.before.eq_ignore_case(
+                                                    "content-digest"
+                                                )
+                                                || pair.before.eq_ignore_case(
+                                                    "x-checksum"
+                                                ))
+                                                .ensure(
+                                                    ChunkError.Invalid
+                                                ).try();
+                                        },
+                                    });
+                                },
+                            });
+                        },
+                    });
+                },
+            });
+        });
+        Ok(self.phase == 4)
+    }
+}

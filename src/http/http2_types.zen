@@ -1,0 +1,135 @@
+// Shared HTTP/2 errors, response values, and wire types.
+
+str, String = std.text
+Range, Res = std.core
+Sink, WriteError = std.core
+ActorError = std.actor
+Alloc, AllocError = std.mem
+TlsFault, Transport = tls
+
+H2Error* = ConnectFailed
+    | TlsFailed
+    | SendFailed
+    | RecvFailed
+    | DecodeFailed
+    | ProtocolFailed
+    | Closed
+    | Status(i32)
+
+h2_error* = (e: TlsFault) H2Error {
+    e.match({
+        ConnectFailed => H2Error.ConnectFailed,
+        TlsFailed     => H2Error.TlsFailed,
+        WriteFailed   => H2Error.SendFailed,
+        ReadFailed    => H2Error.RecvFailed,
+        Closed        => H2Error.RecvFailed,
+    })
+}
+
+H2Response* = {
+    status*: i32,
+    body*:   String,
+}
+
+// Value-only, so a head can cross a mailbox. Informational responses are
+// delivered; Trailers carries no status.
+H2Head* = Informational(i32) | Response(i32) | Trailers
+
+// A streaming request can fail in the connection or at the receiver mailbox.
+H2StreamError* = Http(H2Error) | Receiver(ActorError)
+
+// The frame size every peer must accept; this client never advertises more.
+MAX_SEND*: usize = 16384
+
+// One DATA frame's bytes by value, so a chunk can cross a mailbox.
+H2Chunk* = {
+    bytes :: [u8, MAX_SEND],
+    len*:  usize,
+
+    get* = (self: @Self, at: usize) Res<u8> {
+        (at < self.len).match({
+            true  => Ok(self.bytes[at]),
+            false => None,
+        })
+    }
+
+    append_to* = (self: @Self, out :: String) Res<(), AllocError> {
+        Range(0, self.len).loop((h, i) { out.add(self.bytes[i]).try(); });
+        Ok(())
+    }
+
+    write_to* = (self: @Self, out :: Sink) Res<(), WriteError> {
+        Range(0, self.len).loop((h, i) { out.write_byte(self.bytes[i]).try(); });
+        Ok(())
+    }
+
+    copy* = (self: @Self, a: Alloc) Res<String, AllocError> {
+        out ::= a.String().try();
+        self.append_to(out).try();
+        Ok(out);
+    }
+}
+
+H2Chunk.impl(Range<u8>, {
+    start: 0,
+    end: self.len,
+
+    at ::= (self: @Self, index: usize) Res<u8> { self.get(index) }
+})
+
+h2_chunk* = (src: str) Res<H2Chunk, H2Error> {
+    (src.len <= MAX_SEND).ensure(H2Error.ProtocolFailed).try();
+    chunk ::= H2Chunk(bytes: [u8, MAX_SEND](), len: src.len);
+    Range(0, src.len).loop((h, i) { chunk.bytes[i] = src[i]; });
+    Ok(chunk);
+}
+
+// RFC 7540 §6 frame kinds. Unknown values keep their wire byte.
+FrameType* =
+    | Data = 0x0
+        | Headers = 0x1
+        | Priority = 0x2
+        | Reset = 0x3
+        | Settings = 0x4
+        | Push = 0x5
+        | Ping = 0x6
+        | GoAway = 0x7
+        | WindowUpdate = 0x8
+        | Continuation = 0x9
+        | Unknown(u8)
+
+// Flags are independent bits. ACK and END_STREAM share a bit but have
+// different meanings on their respective frame types.
+FrameFlag* = EndStream | Ack | EndHeaders | Padded | Priority
+
+mask* = (flag: FrameFlag) u8 {
+    flag.match({
+        EndStream  => 0x1,
+        Ack        => 0x1,
+        EndHeaders => 0x4,
+        Padded     => 0x8,
+        Priority   => 0x20,
+    })
+}
+
+// SETTINGS identifiers occupy two bytes; unrecognized settings are ignored.
+SettingId* =
+    | HeaderTableSize = 0x1
+        | EnablePush = 0x2
+        | MaxConcurrentStreams = 0x3
+        | InitialWindowSize = 0x4
+        | MaxFrameSize = 0x5
+        | MaxHeaderListSize = 0x6
+        | Unknown(u16)
+
+// The receive window advertised per stream and once on the connection.
+WINDOW*: usize = 16777216
+
+// RFC 7540 §6.9: a window is 31 bits.
+DEFAULT_WINDOW*: usize = 65535
+MAX_WINDOW*: usize = 2147483647
+
+// Inbound payloads above this are ProtocolFailed.
+MAX_RECV*: usize = 1048576
+
+PREFACE*: str = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"

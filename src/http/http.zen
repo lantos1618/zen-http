@@ -1,0 +1,6 @@
+// HTTP package: application protocols live here; std supplies OS/TLS primitives.
+serve*, Handler*, Options*, Request*, Response*, Status*, ServerError* = http.server
+HttpClient*, HttpError*, HttpResponse*, HttpResponseMeta* = http.client
+parse_response*, parse_response_into* = http.client_decode
+H2Client*, post_once* = http.http2_client
+H2Error*, H2StreamError*, H2Response*, H2Head*, H2Chunk*, h2_chunk* = http.http2_types

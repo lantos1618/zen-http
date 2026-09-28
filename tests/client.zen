@@ -1,0 +1,25 @@
+HttpClient, HttpError, HttpResponse = http
+Failure = WrongBody | WrongStatus | AcceptedUntrusted
+main = (env: Env) Res<(), AllocError | HttpError | Failure> {
+    a      = env.mem.alloc();
+    tls    = env.argv.find(
+        (arg) { arg == "--tls" }
+    ).match({Ok(_) => true, None => false});
+    reject = env.argv.find(
+        (arg) { arg == "--reject" }
+    ).match({Ok(_) => true, None => false});
+    url    = tls.match({ true => "https://localhost:18080/echo", false => "http://127.0.0.1:18080/echo" });
+    client = HttpClient();
+    result = client.post(a, url, a.Vec<str>(), "client package check");
+    reject.match({
+        true  => result.match({ Ok(_) => Err(Failure.AcceptedUntrusted), Err(_) => Ok(()) }),
+        false => {
+            response = result.try();
+            (response.status == 200).ensure(Failure.WrongStatus).try();
+            (response.body.view() == "client package check").ensure(
+                Failure.WrongBody
+            ).try();
+            Ok(())
+        },
+    })
+}

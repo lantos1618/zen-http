@@ -1,0 +1,159 @@
+// HTTP/2 frame encoding, decoding, flags, and big-endian payload fields.
+
+Alloc = std.mem
+str, String = std.text
+Res = std.core
+Vec = std.collections
+H2Error, h2_error, FrameType, FrameFlag, SettingId, mask, MAX_RECV = http.http2_types
+Transport, read, write = tls
+
+FRAME_HEADER_LEN: usize = 9
+MAX_FRAME_LEN: usize = 16777215
+STREAM_ID_LIMIT: usize = 2147483648
+
+H2Range* = { from*: usize, len*: usize }
+
+Frame* = {
+    ftype*:   FrameType,
+    flags*:   u8,
+    sid*:     usize,
+    payload*: Vec<u8>,
+
+    has_flag* = (self: @Self, flag: FrameFlag) bool {
+        (self.flags / flag.mask()) % 2 == 1;
+    }
+
+    // Locate application bytes after optional DATA/HEADERS prefixes.
+    content_range* = (self: @Self) Res<H2Range, H2Error> {
+        from: usize ::= 0;
+        pad: usize  ::= 0;
+        self.has_flag(FrameFlag.Padded).then(() {
+            p    = self.payload.get(0).ok_or(H2Error.DecodeFailed).try();
+            pad  = p.to_usize();
+            from = 1;
+        });
+        self.ftype.match({
+            Headers => self.has_flag(FrameFlag.Priority).then(() {
+                from = from + 5;
+            }),
+            _       => None,
+        });
+        (from + pad <= self.payload.len).ensure(H2Error.DecodeFailed).try();
+        Ok(H2Range(from: from, len: self.payload.len - from - pad));
+    }
+}
+
+// Reuse wire storage across frames. A returned payload borrows this reader
+// until its next read; consumers must finish processing it before then.
+FrameReader* = {
+    header :: Vec<u8>,
+    payload :: Vec<u8>,
+    chunk :: Vec<u8>,
+
+    read_n = (self :: @Self, s: Transport, buf :: Vec<u8>, n: usize)
+             Res<(), H2Error> {
+        buf.clear();
+        left ::= n;
+        (left > 0).loop((h) {
+            got = s.read(self.chunk, left).try((e) { e.h2_error() });
+            (got > 0).ensure(H2Error.RecvFailed).try();
+            buf.add_all(self.chunk.ptr(), got).try(H2Error.RecvFailed);
+            left = left - got;
+        });
+        Ok(())
+    }
+
+    read* = (self :: @Self, s: Transport) Res<Frame, H2Error> {
+        self.read_n(s, self.header, FRAME_HEADER_LEN).try();
+        len = self.header.be_of(0, 3).replace_err(H2Error.RecvFailed).try();
+        (len <= MAX_RECV).ensure(H2Error.ProtocolFailed).try();
+        sid = self.header.be_of(5, 4).replace_err(H2Error.RecvFailed).try()
+            % STREAM_ID_LIMIT;
+        self.read_n(s, self.payload, len).try();
+        Ok(Frame(
+            ftype: FrameType.from_discriminant(
+                self.header.get(3).ok_or(H2Error.RecvFailed).try()
+            ),
+            flags: self.header.get(4).ok_or(H2Error.RecvFailed).try(),
+            sid: sid,
+            payload: self.payload
+        ))
+    }
+}
+
+FrameReader* = (a: Alloc) FrameReader {
+    FrameReader(header: a.Vec<u8>(), payload: a.Vec<u8>(), chunk: a.Vec<u8>())
+}
+
+// Independent storage for callers retaining a frame past their next read.
+read_frame* = (s: Transport, a: Alloc) Res<Frame, H2Error> {
+    reader ::= a.FrameReader();
+    reader.read(s)
+}
+
+add_wire_byte = (out :: String, value: usize) Res<(), H2Error> {
+    byte = value.to_u8().ok_or(H2Error.ProtocolFailed).try();
+    out.add(byte).try(H2Error.SendFailed);
+    Ok(())
+}
+
+// The low `width` bytes of `value`, most significant first.
+add_be = (out :: String, value: usize, width: usize) Res<(), H2Error> {
+    Range(0, width).loop((h, i) {
+        shift = (width - 1 - i) * 8;
+        out.add_wire_byte((value / shift.pow2()) % 256).try();
+    });
+    Ok(())
+}
+
+write_frame* = (
+    s       : Transport,
+    a       : Alloc,
+    ftype   : FrameType,
+    flags   : u8,
+    sid     : usize,
+    payload : str
+) Res<(), H2Error> {
+    len = payload.len;
+    (len <= MAX_FRAME_LEN).ensure(H2Error.ProtocolFailed).try();
+
+    hdr ::= a.String().try(H2Error.SendFailed);
+    hdr.add_be(len, 3).try();
+    hdr.add(ftype.discriminant()).try(H2Error.SendFailed);
+    hdr.add(flags).try(H2Error.SendFailed);
+    hdr.add_be(sid % STREAM_ID_LIMIT, 4).try();
+    hdr.add(payload).try(H2Error.SendFailed);
+    s.write(hdr.view()).map_err((e) { e.h2_error() })
+}
+
+settings_add* = (blk :: String, id: SettingId, val: usize) Res<(), H2Error> {
+    blk.add_be(id.discriminant().to_usize(), 2).try();
+    blk.add_be(val, 4)
+}
+
+setting_at* = (payload: Vec<u8>, at: usize) Res<SettingId, H2Error> {
+    (at < payload.len && payload.len - at >= 2).ensure(
+        H2Error.DecodeFailed
+    ).try();
+    high = payload.get(at).ok_or(H2Error.DecodeFailed).try().to_u16();
+    low  = payload.get(at + 1).ok_or(H2Error.DecodeFailed).try().to_u16();
+    Ok(SettingId.from_discriminant(high * 256 + low))
+}
+
+u32_add* = (blk :: String, val: usize) Res<(), H2Error> {
+    blk.add_be(val, 4)
+}
+
+// `width` big-endian bytes at `at`.
+be_of* = (payload: Vec<u8>, at: usize, width: usize) Res<usize, H2Error> {
+    n: usize ::= 0;
+    Range(at, at + width).loop((h, i) {
+        b: u8 = payload.get(i).ok_or(H2Error.DecodeFailed).try();
+        n     = n * 256 + b.to_usize();
+    });
+    Ok(n)
+}
+
+u31_of* = (payload: Vec<u8>, at: usize) Res<usize, H2Error> {
+    Ok(payload.be_of(at, 4).try() % STREAM_ID_LIMIT)
+}

@@ -1,0 +1,72 @@
+transport_io, resume_read = http.transport
+NativeTransport = c.record("transport.h", "struct transport", {
+    fd: i32,
+    ssl: Ptr<()>,
+    want: i32,
+    armed: i32,
+})
+Native = c.bind("transport.h", {
+    AF_UNIX: i32
+    SOCK_STREAM: i32
+    F_SETFL: i32
+    O_NONBLOCK: i32
+    POLLIN: i32
+    POLLOUT: i32
+    socketpair = (domain: i32, kind: i32, protocol: i32, fds: Ptr<i32>) i32
+    fcntl = (fd: i32, command: i32, flags: i32) i32
+    close = (fd: i32) i32
+})
+Failure = Setup | Incorrect
+main = (env: Env) Res<(), AllocError | Failure> {
+    a   = env.mem.alloc();
+    fds = a.realloc<i32>(null_ptr<i32>(), 2).try();
+    (Native.socketpair(Native.AF_UNIX, Native.SOCK_STREAM, 0, fds) == 0).ensure(Failure.Setup).try();
+    left  = fds.read(0);
+    right = fds.read(1);
+    @scope.defer(() { Native.close(left); });
+    (Native.fcntl(left, Native.F_SETFL, Native.O_NONBLOCK) == 0).ensure(Failure.Setup).try();
+    (Native.fcntl(right, Native.F_SETFL, Native.O_NONBLOCK) == 0).ensure(Failure.Setup).try();
+    sender   = a.realloc<NativeTransport>(null_ptr<NativeTransport>(), 1).try();
+    receiver = a.realloc<NativeTransport>(null_ptr<NativeTransport>(), 1).try();
+    sender.write(
+        0,
+        NativeTransport(fd: left, ssl: null_ptr<()>(), want: 0, armed: 0)
+    );
+    receiver.write(
+        0,
+        NativeTransport(fd: right, ssl: null_ptr<()>(), want: 0, armed: 0)
+    );
+    buffer = a.realloc<u8>(null_ptr<u8>(), 65536).try();
+    Range(0, 65536).loop((i) { buffer.write(i, 42); });
+    (transport_io(receiver.to<()>(), buffer, 65536, 0) == -2).ensure(Failure.Incorrect).try();
+    (receiver.read(0).want == Native.POLLIN).ensure(Failure.Incorrect).try();
+    sent: i64 ::= 0;
+    attempts  ::= 0;
+    loop((h) {
+        n = transport_io(sender.to<()>(), buffer, 65536, 1);
+        (n == -2).then(() { h.break(); });
+        (n > 0 && n <= 65536).ensure(Failure.Incorrect).try();
+        sent     = sent + n;
+        attempts = attempts + 1;
+        (attempts < 1024).ensure(Failure.Incorrect).try();
+    });
+    (sent > 0 && sender.read(0).want == Native.POLLOUT).ensure(Failure.Incorrect).try();
+    received: i64 ::= 0;
+    loop((h) {
+        n = transport_io(receiver.to<()>(), buffer, 65536, 0);
+        (n == -2).then(() { h.break(); });
+        (n > 0).ensure(Failure.Incorrect).try();
+        received = received + n;
+        Range(0, n.to_usize().ok_or(Failure.Incorrect).try()).loop((i) {
+            (buffer.read(i) == 42).ensure(Failure.Incorrect).try();
+        });
+    });
+    (received == sent).ensure(Failure.Incorrect).try();
+    (transport_io(sender.to<()>(), buffer, 1, 1) == 1).ensure(Failure.Incorrect).try();
+    (transport_io(receiver.to<()>(), buffer, 1, 0) == 1).ensure(Failure.Incorrect).try();
+    (resume_read(sender.to<()>()) == 0 && sender.read(0).want == Native.POLLIN).ensure(Failure.Incorrect).try();
+    Native.close(right);
+    (transport_io(sender.to<()>(), buffer, 1, 0) == -1).ensure(Failure.Incorrect).try();
+    println("transport retry, backpressure, recovery and EOF PASS");
+    Ok(())
+}

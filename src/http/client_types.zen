@@ -1,0 +1,35 @@
+// Shared HTTP/1 public data types and the transport error mapping into them.
+
+String = std.text
+WriteError = std.core.io
+TlsFault, Transport = tls
+
+HttpError* = ConnectFailed
+    | TlsFailed
+    | SendFailed
+    | RecvFailed
+    | DecodeFailed
+    | BodyWriteFailed(WriteError)
+    | Status(i32)
+
+http_error* = (e: TlsFault) HttpError {
+    e.match({
+        TlsFault.ConnectFailed => HttpError.ConnectFailed,
+        TlsFault.TlsFailed     => HttpError.TlsFailed,
+        TlsFault.WriteFailed   => HttpError.SendFailed,
+        TlsFault.ReadFailed    => HttpError.RecvFailed,
+        TlsFault.Closed        => HttpError.RecvFailed,
+    })
+}
+
+HttpResponseMeta* = {
+    status*:             i32,
+    content_length*:     usize,
+    has_content_length*: bool,
+    chunked*:            bool,
+}
+
+HttpResponse* = {
+    status*: i32,
+    body*:   String,
+}

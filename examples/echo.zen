@@ -1,0 +1,27 @@
+serve, Handler, Options, Request, Response, Status, ServerError = http
+Echo = {}
+Echo.impl(Handler, {
+    handle = (self :: @Self, request: Request) Response {
+        (request.method == "POST" && request.target == "/echo").match({
+            true  => Response(status: Status.Ok, body: request.body),
+            false => Response(status: Status.NotFound, body: "not found"),
+        })
+    }
+})
+main = (env: Env) Res<(), AllocError | ServerError> {
+    tls = env.argv.find(
+        (arg) { arg == "--tls" }
+    ).match({Ok(_) => true, None => false});
+    echo ::= Echo();
+    serve(
+        env.mem.alloc(),
+        Options(
+            host: "127.0.0.1",
+            port: 18080,
+            tls: tls,
+            certificate: "build/cert.pem",
+            private_key: "build/key.pem"
+        ),
+        echo
+    )
+}

@@ -1,0 +1,225 @@
+// Bounded, persistent HPACK request decoder. Protocol failures are fatal to
+// this decoder's connection; the dynamic table may already have advanced.
+Alloc, Ptr, null_ptr = std.mem
+Res, Range = std.core
+str, dup, str_at = std.text
+H2Error, H2Head = http.http2_types
+Header, static_header_at, huffman = http.http2_hpack
+
+H2RequestHead* = {
+    method* :: str = "", path* :: str = "", scheme* :: str = "", authority* :: str = "",
+    content_length* :: Res<usize> = None,
+}
+Cursor = {
+    bytes: str, alloc: Alloc, pos :: usize = 0,
+    byte = (self :: @Self) Res<u8, H2Error> {
+        b        = self.bytes.get(self.pos).ok_or(H2Error.DecodeFailed).try();
+        self.pos = self.pos + 1; Ok(b)
+    }
+    integer = (self :: @Self, prefix: usize) Res<usize, H2Error> {
+        limit = prefix.pow2() - 1;
+        value ::= self.byte().try().to_usize() % prefix.pow2();
+        (value == limit).then(() {
+            multiplier: usize ::= 1;
+            loop((h) {
+                b = self.byte().try(); digit = b.to_usize() % 128;
+                (digit <= (usize.MAX - value) / multiplier).ensure(
+                    H2Error.DecodeFailed
+                ).try();
+                value = value + digit * multiplier;
+                (b < 128).then(() { h.break(); });
+                (multiplier <= usize.MAX / 128).ensure(
+                    H2Error.DecodeFailed
+                ).try();
+                multiplier = multiplier * 128;
+            });
+        }); Ok(value)
+    }
+    string = (self :: @Self) Res<str, H2Error> {
+        encoded = self.bytes.get(self.pos).ok_or(H2Error.DecodeFailed).try() >= 128;
+        len     = self.integer(7).try();
+        (len <= self.bytes.len - self.pos).ensure(H2Error.DecodeFailed).try();
+        s = self.bytes.slice(
+            self.pos,
+            self.pos + len
+        ); self.pos = self.pos + len;
+        encoded.match({ false => Ok(s), true => Ok(s.huffman(self.alloc).try().view()) })
+    }
+}
+H2RequestDecoder* = {
+    storage: Ptr<u8>, names :: [usize, 128], values :: [usize, 128],
+    count :: usize = 0, used :: usize = 0, cost :: usize = 0, maximum :: usize = 4096,
+    lookup = (self: @Self, index: usize) Res<Header, H2Error> {
+        (index <= 61).match({ true => index.static_header_at().ok_or(
+            H2Error.DecodeFailed
+        ), false => {
+        i = index - 62; (i < self.count).ensure(H2Error.DecodeFailed).try();
+        offset: usize ::= 0;
+        Range(0, i).loop((j) { offset = offset + self.names[j] + self.values[j]; });
+        Ok(Header(
+            name: str_at(self.storage.offset(offset), self.names[i]),
+            value: str_at(
+                self.storage.offset(offset + self.names[i]),
+                self.values[i]
+            )
+        ))
+        } })
+    }
+    evict = (self :: @Self, required: usize) () {
+        loop(() { self.count > 0 && self.cost + required > self.maximum }, (h) {
+            self.count = self.count - 1;
+            bytes      = self.names[self.count] + self.values[self.count];
+            self.used  = self.used - bytes; self.cost = self.cost - bytes - 32;
+        });
+    }
+    insert = (self :: @Self, field: Header, a: Alloc) Res<(), H2Error> {
+        bytes = field.name.len + field.value.len;
+        self.evict(bytes + 32);
+        (bytes + 32 <= self.maximum).then(() {
+            // The source name may refer to our table, so copy before shifting.
+            name  = field.name.dup(a).try(H2Error.DecodeFailed);
+            value = field.value.dup(a).try(H2Error.DecodeFailed);
+            Range(0, self.used).loop((j) {
+                i = self.used - j - 1;
+                self.storage.write(i + bytes, self.storage.read(i));
+            });
+            Range(0, self.count).loop((j) {
+                i                 = self.count - j - 1;
+                self.names[i + 1] = self.names[i]; self.values[i + 1] = self.values[i];
+            });
+            name.copy_into(self.storage); value.copy_into(self.storage.offset(name.len));
+            self.names[0] = name.len; self.values[0] = value.len;
+            self.used = self.used + bytes; self.cost = self.cost + bytes + 32; self.count = self.count + 1;
+        }); Ok(())
+    }
+    decode* = (self :: @Self, block: str, request_alloc: Alloc) Res<H2RequestHead, H2Error> {
+        (block.len <= 8192).ensure(H2Error.DecodeFailed).try();
+        cursor ::= Cursor(bytes: block, alloc: request_alloc);
+        head   ::= H2RequestHead(); ordinary ::= false; fields: usize ::= 0; total: usize ::= 0;
+        method ::= false; path ::= false; scheme ::= false; authority ::= false; host ::= false; host_value ::= "";
+        loop(() { cursor.pos < block.len }, (h) {
+            kind = block[cursor.pos];
+            (kind >= 32 && kind < 64).then(() {
+                (fields == 0).ensure(H2Error.DecodeFailed).try();
+                size = cursor.integer(5).try();
+                (size <= 4096).ensure(H2Error.DecodeFailed).try();
+                self.maximum = size; self.evict(0); h.next();
+            });
+            indexed     = kind >= 128;
+            incremental = kind >= 64 && kind < 128;
+            field       = indexed.match({
+                true  => self.lookup(cursor.integer(7).try()).try(),
+                false => {
+                    prefix: usize = incremental.match({ true => 6, false => 4 });
+                    index         = cursor.integer(prefix).try();
+                    name          = (index == 0).match({ true => cursor.string().try(), false => self.lookup(
+                        index
+                    ).try().name });
+                    Header(name: name, value: cursor.string().try())
+                },
+            });
+            fields      = fields + 1; total = total + field.name.len + field.value.len + 32;
+            (fields <= 100 && total <= 16384).ensure(
+                H2Error.ProtocolFailed
+            ).try();
+            name = field.name; value = field.value;
+            (name.len > 0).ensure(H2Error.ProtocolFailed).try();
+            Range(0, name.len).loop((i) {
+                b     = name[i];
+                valid = (b >= 'a' && b <= 'z') || (b >= '0' && b <= '9') || "!#$%&'*+-.^_`|~".contains(
+                    b
+                ) || (i == 0 && b == ':');
+                valid.ensure(H2Error.ProtocolFailed).try();
+            });
+            Range(0, value.len).loop((i) {
+                b = value[i]; (b == 9 || (b >= 32 && b != 127)).ensure(
+                    H2Error.ProtocolFailed
+                ).try();
+            });
+            (value.len > 0).then(() {
+                (value[0] != ' ' && value[0] != 9 && value[value.len - 1] != ' ' && value[value.len - 1] != 9).ensure(
+                    H2Error.ProtocolFailed
+                ).try();
+            });
+            name.starts_with(":").match({
+                true  => {
+                    (!ordinary).ensure(H2Error.ProtocolFailed).try();
+                    name.eq(":method").match({
+                        true  => { (!method && value.len > 0).ensure(H2Error.ProtocolFailed).try(); method = true; head.method = value.dup(request_alloc).try(H2Error.DecodeFailed); },
+                        false => name.eq(":path").match({
+                            true  => { (!path && value.len > 0).ensure(H2Error.ProtocolFailed).try(); path = true; head.path = value.dup(request_alloc).try(H2Error.DecodeFailed); },
+                            false => name.eq(":scheme").match({
+                                true  => { (!scheme && (value.eq("http") || value.eq("https"))).ensure(H2Error.ProtocolFailed).try(); scheme = true; head.scheme = value.dup(request_alloc).try(H2Error.DecodeFailed); },
+                                false => { (name.eq(":authority") && !authority).ensure(H2Error.ProtocolFailed).try(); authority = true; head.authority = value.dup(request_alloc).try(H2Error.DecodeFailed); },
+                            }),
+                        }),
+                    });
+                },
+                false => {
+                    ordinary = true;
+                    (!name.eq("connection") && !name.eq("proxy-connection") && !name.eq("keep-alive") && !name.eq("transfer-encoding") && !name.eq("upgrade")).ensure(H2Error.ProtocolFailed).try();
+                    (!name.eq("te") || value.eq("trailers")).ensure(H2Error.ProtocolFailed).try();
+                    name.eq("host").then(() {
+                        (!host && value.len > 0).ensure(
+                            H2Error.ProtocolFailed
+                        ).try();
+                        host = true; host_value = value.dup(
+                            request_alloc
+                        ).try(H2Error.DecodeFailed);
+                    });
+                    name.eq("content-length").then(() {
+                        head.content_length.match({ Ok(_) => Err(
+                            H2Error.ProtocolFailed
+                        ).try(), None => {} });
+                        (value.len > 0).ensure(
+                            H2Error.ProtocolFailed
+                        ).try(); n: usize ::= 0;
+                        Range(0, value.len).loop((i) {
+                            b = value[i]; (b >= '0' && b <= '9').ensure(
+                                H2Error.ProtocolFailed
+                            ).try();
+                            digit = (b - '0').to_usize();
+                            (n <= (usize.MAX - digit) / 10).ensure(
+                                H2Error.ProtocolFailed
+                            ).try(); n = n * 10 + digit;
+                        }); head.content_length = Ok(n);
+                    });
+                },
+            });
+            incremental.then(() { self.insert(field, request_alloc).try(); });
+        });
+        (method && path && scheme && !head.method.eq("CONNECT")).ensure(H2Error.ProtocolFailed).try();
+        (head.path.starts_with("/") || (head.method.eq("OPTIONS") && head.path.eq("*"))).ensure(H2Error.ProtocolFailed).try();
+        Range(0, head.method.len).loop((i) {
+            b = head.method[i];
+            ((b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9') || "!#$%&'*+-.^_`|~".contains(b)).ensure(H2Error.ProtocolFailed).try();
+        });
+        Range(0, head.path.len).loop((i) {
+            b = head.path[i]; (b > 32 && b != 127 && b != '#').ensure(
+                H2Error.ProtocolFailed
+            ).try();
+        });
+        // Origin requests need an authority; HTTP/2 also permits a Host field.
+        ((authority && head.authority.len > 0) || host).ensure(
+            H2Error.ProtocolFailed
+        ).try();
+        (authority && host).then(() {
+            head.authority.eq_ignore_case(host_value).ensure(H2Error.ProtocolFailed).try();
+        });
+        (!authority && host).then(() { head.authority = host_value; });
+        Range(0, head.authority.len).loop((i) {
+            b = head.authority[i];
+            (b > 32 && b < 127 && b != '/' && b != '?' && b != '#' && b != '@' && b != ',' && b != 92).ensure(
+                H2Error.ProtocolFailed
+            ).try();
+        });
+        Ok(head)
+    }
+}
+h2_request_decoder* = (a: Alloc) Res<H2RequestDecoder, H2Error> {
+    Ok(H2RequestDecoder(
+        storage: a.realloc<u8>(null_ptr<u8>(), 4096).try(H2Error.DecodeFailed),
+        names: [usize, 128](),
+        values: [usize, 128]()
+    ))
+}

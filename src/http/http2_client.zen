@@ -1,0 +1,593 @@
+// Stateful HTTP/2 client built from transport, frame, and HPACK layers.
+
+Alloc = std.mem
+str, String = std.text
+Res = std.core
+Sink = std.core
+Vec = std.collections
+parse_url = std.net.url
+Transport, dial, write, close = tls
+Actor, ActorError, Receive, Ref = std.actor
+H2Error, h2_error, H2StreamError, H2Response, H2Head, H2Chunk, h2_chunk, FrameType, FrameFlag, SettingId, mask, MAX_SEND, WINDOW, DEFAULT_WINDOW, MAX_WINDOW, PREFACE = http.http2_types
+Frame, FrameReader, write_frame, settings_add, setting_at, u32_add, u31_of, be_of = http.http2_frame
+hpack_response_headers, hpack_trailer_headers, block_add_header, block_add_user_header = http.http2_hpack
+
+H2ReadState = {
+    status    :: i32 = 0,
+    got_final :: bool = false,
+    done      :: bool = false,
+}
+
+H2Data = {
+    // Borrows the frame reader until the next response event.
+    bytes:       str,
+    credit:      usize,
+    stream_open: bool,
+}
+
+H2Event = Headers(H2Head) | Data(H2Data)
+
+H2Client* = {
+    stream   :: Transport,
+    reader   :: FrameReader,
+    sid      :: usize,   // next stream id: 1, 3, 5...
+    open     :: bool,    // false once the peer's GOAWAY lands
+    secure   :  bool,
+    host     :  String,  // the :authority we send
+    path     :  String,  // the :path post() sends
+    init_win :: usize,   // peer's INITIAL_WINDOW_SIZE for new streams
+    send_win :: usize,   // in-flight stream's remaining send credit
+    send_debt :: usize,  // amount below zero after SETTINGS reduces the window
+    conn_win :: usize,   // connection-level remaining send credit
+    active   :: usize,   // the one stream currently being sent or received
+    got_peer_settings :: bool,
+    got_goaway :: bool,
+    peer_last :: usize,   // GOAWAY's last-stream-id; zero is a real value
+
+    // Connect and run the preface/SETTINGS handshake. https offers ALPN
+    // "h2" only and refuses a peer that does not answer it; http is
+    // prior-knowledge h2c.
+    connect* = (a: Alloc, url: str) Res<H2Client, H2Error> {
+        parsed = url.parse_url().replace_err(H2Error.DecodeFailed).try();
+        secure = parsed.scheme.eq_ignore_case("https");
+        stream = dial(a, parsed.host, parsed.port, secure, true)
+            .try((e) { e.h2_error() });
+        secure.then(() { stream.alpn_check(a).try(); });
+
+        host ::= a.String().try(H2Error.ConnectFailed);
+        host.add(parsed.host).try(H2Error.ConnectFailed);
+        path ::= a.String().try(H2Error.ConnectFailed);
+        path.add(parsed.path).try(H2Error.ConnectFailed);
+
+        c ::= H2Client(
+            stream: stream, reader: a.FrameReader(), sid: 1, open: true, secure: secure,
+            host: host, path: path,
+            init_win: DEFAULT_WINDOW, send_win: DEFAULT_WINDOW, send_debt: 0,
+            conn_win: DEFAULT_WINDOW, active: 0,
+            got_peer_settings: false, got_goaway: false, peer_last: 0,
+        );
+
+        stream.write(PREFACE).try((e) { e.h2_error() });
+
+        // No dynamic HPACK table; receive credit is replenished only after
+        // the response consumer accepts DATA.
+        settings ::= a.String().try(H2Error.SendFailed);
+        settings.settings_add(SettingId.HeaderTableSize, 0).try();
+        settings.settings_add(SettingId.InitialWindowSize, WINDOW).try();
+        stream.write_frame(a, FrameType.Settings, 0, 0, settings.view()).try();
+
+        // Match the advertised receive window on stream 0.
+        bump ::= a.String().try(H2Error.SendFailed);
+        bump.u32_add(WINDOW).try();
+        stream.write_frame(a, FrameType.WindowUpdate, 0, 0, bump.view()).try();
+
+        // Complete the peer SETTINGS handshake before opening a stream.
+        loop((h) {
+            c.got_peer_settings.then(() { h.break(); });
+            f = c.reader.read(c.stream).try();
+            c.control(a, f).try()
+                .ensure(H2Error.ProtocolFailed).try();
+            c.open.ensure(H2Error.Closed).try();
+        });
+
+        // The local stream owns cleanup while the handshake can still fail.
+        // Transfer that ownership only after the client is ready to return.
+        c.stream = consume stream;
+        Ok(c);
+    }
+
+    // Open one POST stream and send its request. next_response_event owns all
+    // response parsing for both buffered and actor consumers.
+    send_post = (self :: @Self, a: Alloc, headers: Vec<str>, body: str)
+                Res<usize, H2Error> {
+        self.open.ensure(H2Error.Closed).try();
+
+        sid            = self.sid;
+        self.sid       = self.sid + 2;
+        self.send_win  = self.init_win;
+        self.send_debt = 0;
+        self.active    = sid;
+
+        blk ::= a.String().try(H2Error.SendFailed);
+        blk.block_add_header(":method", "POST").try();
+        blk.block_add_header(
+            ":scheme",
+            self.secure.match({ true => "https", false => "http" })
+        ).try();
+        blk.block_add_header(":path", self.path.view()).try();
+        blk.block_add_header(":authority", self.host.view()).try();
+        headers.loop((hh, line) { blk.block_add_user_header(line).try(); });
+
+        lenstr ::= a.String().try(H2Error.SendFailed);
+        lenstr.fmt("{}", body.len).try(H2Error.SendFailed);
+        blk.block_add_header("content-length", lenstr.view()).try();
+
+        (blk.len() <= MAX_SEND).ensure(H2Error.SendFailed).try();
+
+        hflags = body.len == 0;
+        self.stream.write_frame(
+            a,
+            FrameType.Headers,
+            hflags.match({ true => FrameFlag.EndHeaders.mask() + FrameFlag.EndStream.mask(), false => FrameFlag.EndHeaders.mask() }),
+            sid,
+            blk.view()
+        ).try();
+
+        off: usize ::= 0;
+        loop((h) {
+            (off >= body.len).then(() { h.break(); });
+
+            // Wait for both connection and stream send credit.
+            loop((h2) {
+                avail = self.send_win;
+                (self.conn_win < avail).then(() { avail = self.conn_win; });
+                (avail > 0).then(() { h2.break(); });
+                f = self.reader.read(self.stream).try();
+                self.control(a, f).try()
+                    .ensure(H2Error.ProtocolFailed).try();
+            });
+
+            avail = self.send_win;
+            (self.conn_win < avail).then(() { avail = self.conn_win; });
+            n ::= body.len - off;
+            (avail < n).then(() { n = avail; });
+            (MAX_SEND < n).then(() { n = MAX_SEND; });
+
+            last = off + n == body.len;
+            self.stream.write_frame(
+                a,
+                FrameType.Data,
+                last.match({ true => FrameFlag.EndStream.mask(), false => 0 }),
+                sid,
+                body.slice(off, off + n)
+            ).try();
+            self.send_win = self.send_win - n;
+            self.conn_win = self.conn_win - n;
+            off           = off + n;
+        });
+
+        Ok(sid);
+    }
+
+    // Deliver each response-body chunk to an actor. Completion is the
+    // successful return; connection, status, and mailbox failures are
+    // returned to the caller.
+    post_stream* = <R: Actor + Receive<H2Chunk>>(
+        self     :: @Self,
+        a        : Alloc,
+        headers  : Vec<str>,
+        body     : str,
+        receiver : Ref<R>
+    ) Res<(), H2StreamError> {
+        self.send_post(a, headers, body).match({
+            Err(error) => self.stream_failed(error),
+            Ok(sid)    => self.stream_response(a, sid, receiver),
+        })
+    }
+
+    stream_response = <R: Actor + Receive<H2Chunk>>(
+        self     :: @Self,
+        a        : Alloc,
+        sid      : usize,
+        receiver : Ref<R>
+    ) Res<(), H2StreamError> {
+        state ::= H2ReadState();
+
+        loop((h) {
+            state.done.then(() { h.break(); });
+            self.next_response_event(a, sid, state).match({
+                Err(error) => self.stream_failed(error).try(),
+                Ok(event)  => event.match({
+                    Headers(_) => (),
+                    Data(data) => receiver.receive(
+                        h2_chunk(data.bytes).try((error) { H2StreamError.Http(error) })
+                    ).match({
+                        Err(error) => self.receiver_refused(
+                            !state.done,
+                            error
+                        ).try(),
+                        Ok(_)      => {
+                            self.restore_recv_window(
+                                a,
+                                sid,
+                                data.credit,
+                                data.stream_open
+                            ).match({
+                                Ok(_)      => (),
+                                Err(error) => self.stream_failed(error).try(),
+                            });
+                        },
+                    }),
+                }),
+            });
+        });
+
+        self.active = 0;
+        (state.status != 0)
+            .ensure(H2StreamError.Http(H2Error.DecodeFailed)).try();
+        (state.status >= 400).match({
+            true  => Err(H2StreamError.Http(H2Error.Status(state.status))),
+            false => Ok(()),
+        })
+    }
+
+    stream_failed = (self :: @Self, error: H2Error) Res<(), H2StreamError> {
+        self.active = 0;
+        self.open   = false;
+        Err(H2StreamError.Http(error))
+    }
+
+    receiver_refused = (
+        self   :: @Self,
+        unread : bool,
+        error  : ActorError
+    ) Res<(), H2StreamError> {
+        unread.then(() { self.open = false; });
+        self.active = 0;
+        Err(H2StreamError.Receiver(error))
+    }
+
+    // Buffered consumer of next_response_event.
+    read_response_into = (self :: @Self, a: Alloc, sid: usize, out :: Sink)
+                         Res<i32, H2Error> {
+        state ::= H2ReadState();
+
+        loop((h) {
+            state.done.then(() { h.break(); });
+            self.next_response_event(a, sid, state).try().match({
+                Headers(_) => (),
+                Data(data) => {
+                    out.write(data.bytes).try(H2Error.RecvFailed);
+                    self.restore_recv_window(
+                        a,
+                        sid,
+                        data.credit,
+                        data.stream_open
+                    ).try();
+                },
+            });
+        });
+
+        (state.status != 0).ensure(H2Error.DecodeFailed).try();
+        self.active = 0;
+        Ok(state.status);
+    }
+
+    next_response_event = (
+        self  :: @Self,
+        a     : Alloc,
+        sid   : usize,
+        state :: H2ReadState
+    ) Res<H2Event, H2Error> {
+        event: Res<H2Event> ::= None;
+        loop((h) {
+            f = self.reader.read(self.stream).try();
+
+            self.control(a, f).try().then(() {
+                f.ftype.match({
+                    GoAway => (!(self.got_goaway && sid > self.peer_last))
+                        .ensure(H2Error.Closed).try(),
+                    _      => (),
+                });
+                h.next();
+            });
+
+            (f.sid == sid).ensure(H2Error.ProtocolFailed).try();
+            f.ftype.match({
+                Headers  => {
+                    event = Ok(self.headers_event(a, f, state).try());
+                    h.break();
+                },
+                Data     => {
+                    event = Ok(self.data_event(f, state).try());
+                    h.break();
+                },
+                Priority => h.next(),
+                _        => Err(H2Error.ProtocolFailed).try(),
+            });
+        });
+        Ok(event.ok_or(H2Error.ProtocolFailed).try());
+    }
+
+    headers_event = (
+        self  : @Self,
+        a     : Alloc,
+        f     : Frame,
+        state :: H2ReadState
+    ) Res<H2Event, H2Error> {
+        Ok(H2Event.Headers(self.decode_headers(a, f, state).try()))
+    }
+
+    decode_headers = (
+        self  : @Self,
+        a     : Alloc,
+        f     : Frame,
+        state :: H2ReadState
+    ) Res<H2Head, H2Error> {
+        // CONTINUATION is not supported: a header block ends in its frame.
+        f.has_flag(FrameFlag.EndHeaders)
+            .ensure(H2Error.ProtocolFailed).try();
+        range = f.content_range().try();
+
+        headers ::= state.got_final.match({
+            true  => f.payload.hpack_trailer_headers(
+                a,
+                range.from,
+                range.len
+            ).try(),
+            false => f.payload.hpack_response_headers(
+                a,
+                range.from,
+                range.len
+            ).try(),
+        });
+
+        headers.match({
+            Informational(_) => {
+                (!f.has_flag(FrameFlag.EndStream))
+                    .ensure(H2Error.ProtocolFailed).try();
+            },
+            Response(status) => {
+                state.status    = status;
+                state.got_final = true;
+            },
+            Trailers         => f.has_flag(FrameFlag.EndStream)
+                .ensure(H2Error.ProtocolFailed).try(),
+        });
+        f.has_flag(FrameFlag.EndStream).then(() { state.done = true; });
+        Ok(headers);
+    }
+
+    data_event = (
+        self  : @Self,
+        f     : Frame,
+        state :: H2ReadState
+    ) Res<H2Event, H2Error> {
+        state.got_final.ensure(H2Error.ProtocolFailed).try();
+        range = f.content_range().try();
+        (range.len <= MAX_SEND).ensure(H2Error.ProtocolFailed).try();
+        bytes = str_at(f.payload.ptr().offset(range.from), range.len);
+        ended = f.has_flag(FrameFlag.EndStream);
+        ended.then(() { state.done = true; });
+        Ok(H2Event.Data(H2Data(
+            bytes: bytes,
+            credit: f.payload.len,
+            stream_open: !ended,
+        )));
+    }
+
+    // Credit is returned only after the consumer accepts the frame: mailbox
+    // admission for an actor, a completed sink write for post_into. Padding
+    // consumes credit too, so the whole payload length is returned.
+    restore_recv_window = (
+        self        :: @Self,
+        a           : Alloc,
+        sid         : usize,
+        payload_len : usize,
+        stream_open : bool
+    ) Res<(), H2Error> {
+        (payload_len > 0).match({
+            false => Ok(()),
+            true  => {
+                bump ::= a.String().try(H2Error.SendFailed);
+                bump.u32_add(payload_len).try();
+                stream_open.match({
+                    true  => self.stream.write_frame(
+                        a,
+                        FrameType.WindowUpdate,
+                        0,
+                        sid,
+                        bump.view()
+                    ).try(),
+                    false => (),
+                });
+                self.stream.write_frame(
+                    a,
+                    FrameType.WindowUpdate,
+                    0,
+                    0,
+                    bump.view()
+                );
+            },
+        });
+    }
+
+    // Stream one response body into a caller-owned sink. HTTP status is data,
+    // not a transport failure, so callers can inspect non-2xx response bodies.
+    post_into* = (
+        self    :: @Self,
+        a       : Alloc,
+        headers : Vec<str>,
+        body    : str,
+        out     :: Sink
+    ) Res<i32, H2Error> {
+        sid = self.send_post(a, headers, body).try();
+        self.read_response_into(a, sid, out)
+    }
+
+    // Buffered compatibility API over the streaming door.
+    post* = (self :: @Self, a: Alloc, headers: Vec<str>, body: str)
+            Res<H2Response, H2Error> {
+        resp_body ::= a.String().try(H2Error.RecvFailed);
+        status = self.post_into(a, headers, body, resp_body).try();
+        Ok(H2Response(status: status, body: resp_body));
+    }
+
+    // GOAWAY is best-effort; the transport always closes.
+    close* = (self :: @Self, a: Alloc) () {
+        last: usize = (self.sid >= 3).match({ true => self.sid - 2, false => 0 });
+        self.write_goaway(a, last).match({ Ok(_) => (), Err(_) => () });
+        self.stream.close();
+    }
+
+    write_goaway = (self: @Self, a: Alloc, last: usize)
+                   Res<(), H2Error> {
+        payload ::= a.String().try(H2Error.SendFailed);
+        payload.u32_add(last).try();
+        payload.u32_add(0).try();
+        self.stream.write_frame(a, FrameType.GoAway, 0, 0, payload.view())
+    }
+
+    add_conn_credit = (self :: @Self, inc: usize) Res<(), H2Error> {
+        (inc <= MAX_WINDOW - self.conn_win).ensure(
+            H2Error.ProtocolFailed
+        ).try();
+        self.conn_win = self.conn_win + inc;
+        Ok(())
+    }
+
+    add_stream_credit = (self :: @Self, inc: usize) Res<(), H2Error> {
+        left ::= inc;
+        (self.send_debt > 0).match({
+            true  => (left >= self.send_debt).match({
+                true  => {
+                    left           = left - self.send_debt;
+                    self.send_debt = 0;
+                },
+                false => {
+                    self.send_debt = self.send_debt - left;
+                    left           = 0;
+                },
+            }),
+            false => (),
+        });
+        (left <= MAX_WINDOW - self.send_win).ensure(
+            H2Error.ProtocolFailed
+        ).try();
+        self.send_win = self.send_win + left;
+        Ok(())
+    }
+
+    // Returns true when a control frame was consumed.
+    control = (self :: @Self, a: Alloc, f: Frame) Res<bool, H2Error> {
+        f.ftype.match({
+            Settings     => {
+                f.has_flag(FrameFlag.Ack).match({
+                    true  => (),  // ACK of ours
+                    false => {
+                        self.got_peer_settings = true;
+                        self.apply_settings(f).try();
+                        self.stream.write_frame(
+                            a,
+                            FrameType.Settings,
+                            FrameFlag.Ack.mask(),
+                            0,
+                            ""
+                        ).try();
+                    },
+                });
+                Ok(true)
+            },
+            Ping         => {
+                (!f.has_flag(FrameFlag.Ack)).match({
+                    true  => self.stream.write_frame(
+                        a,
+                        FrameType.Ping,
+                        FrameFlag.Ack.mask(),
+                        0,
+                        str_at(f.payload.ptr(), f.payload.len)
+                    ).try(),
+                    false => (),
+                });
+                Ok(true)
+            },
+            WindowUpdate => {
+                (f.payload.len == 4).ensure(H2Error.ProtocolFailed).try();
+                inc = f.payload.u31_of(0).try();
+                (inc > 0).ensure(H2Error.ProtocolFailed).try();
+                (f.sid == 0).match({
+                    true  => self.add_conn_credit(inc).try(),
+                    false => (f.sid == self.active).match({
+                        true  => self.add_stream_credit(inc).try(),
+                        false => (),
+                    }),
+                });
+                Ok(true)
+            },
+            GoAway       => {
+                self.open       = false;
+                self.got_goaway = true;
+                self.peer_last  = f.payload.u31_of(0).try();
+                Ok(true)
+            },
+            _            => Ok(false),
+        });
+    }
+
+    // INITIAL_WINDOW_SIZE changes existing stream send credit.
+    apply_settings = (self :: @Self, f: Frame) Res<(), H2Error> {
+        (f.payload.len % 6 == 0).ensure(H2Error.ProtocolFailed).try();
+        Range(0, f.payload.len / 6).loop((h, i) {
+            base = i * 6;
+            id   = f.payload.setting_at(base).try();
+            val  = f.payload.be_of(base + 2, 4).try();
+            id.match({
+                InitialWindowSize => {
+                (val <= MAX_WINDOW).ensure(H2Error.ProtocolFailed).try();
+                (val >= self.init_win).match({
+                    true  => self.add_stream_credit(val - self.init_win).try(),
+                    false => {
+                        d = self.init_win - val;
+                        (d > self.send_win).match({
+                            true  => {
+                                self.send_debt = self.send_debt
+                                    + (d - self.send_win);
+                                self.send_win  = 0;
+                            },
+                            false => { self.send_win = self.send_win - d; },
+                        });
+                    },
+                });
+                self.init_win = val;
+                },
+                _                 => (),
+            });
+        });
+        Ok(());
+    }
+}
+
+// A TLS peer must have negotiated ALPN h2.
+alpn_check = (s: Transport, a: Alloc) Res<(), H2Error> {
+    s.match({
+        Tcp(_) => Ok(()),
+        Tls(t) => {
+            buf ::= a.Vec<u8>();
+            n = t.alpn(buf).try((e) { e.h2_error() });
+            str_at(buf.ptr(), n).eq("h2").ensure(H2Error.ProtocolFailed)
+        },
+    })
+}
+
+// Single-request convenience API.
+post_once* = (
+    a       : Alloc,
+    url     : str,
+    headers : Vec<str>,
+    body    : str
+) Res<H2Response, H2Error> {
+    c ::= H2Client.connect(a, url).try();
+    r = c.post(a, headers, body);
+    c.close(a);
+    r;
+}

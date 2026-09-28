@@ -1,0 +1,36 @@
+Darwin Lyndons-MacBook-Pro.local 25.6.0 Darwin Kernel Version 25.6.0: Fri Jul 31 19:18:48 PDT 2026; root:xnu-12377.161.14~5/RELEASE_ARM64_T6020 arm64
+Apple clang version 17.0.0 (clang-1700.6.4.2)
+Target: arm64-apple-darwin25.6.0
+Thread model: posix
+InstalledDir: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin
+go version go1.27.1 darwin/arm64
+OpenSSL 3.5.4 30 Sep 2025 (Library: OpenSSL 3.5.4 30 Sep 2025)
+4e7578d175fcb6d2f5b3ae7ad7b13ce14f4309d8
+86097c490263ab662d62e8e7b541390bdec7d149
+2884e04780738180c9159b74531d7867d1c9c77804849bec9f8b94c65a31e12c  /Users/lyndon/zen-dev/zen-http/../zen-actor-runtime/zen
+c8cf5708a9efcad570622239a1ea10d574782b9f04106c05fffdddc7d5a371f0  src/http/client.zen
+eabd62f190d8611692ed70ea3ddc43bbaf93c7763c2dcc9a45a2065363cacc8b  src/http/client_decode.zen
+63fd8d73eb279149ac8f8e3e819068881137837a628c029dce3b8c5c824c58b2  src/http/client_types.zen
+585af7f44ecb48f879538ece39f838a18f74ae86d8a7d7f289005f3107ddaab8  src/http/http.zen
+f108d498ffa581d58addbf858b7e0f994742e16406f453d798593ab5522dba55  src/http/http2.zen
+ce115d8aae834b470e9583ec35dd1bcc1f2c04c50a8f49d2dc1ce3eef76b5aff  src/http/http2_client.zen
+2707f4dc0135d2b7c9ce401b7289158e08fb3f917476ddf818b483190555bf4e  src/http/http2_frame.zen
+1ff9701f5e9c6a30e2227567bd6f2dfc3fc0ff4ce68f7e7368e1bda5e0a82f24  src/http/http2_hpack.zen
+919d7e1108349952644cc0a57361cfa084f01f3f922807397a94ae5b29dffab0  src/http/http2_server_state.zen
+3a64a9edbb143d54493d315b2cb19b9f5c443a2989fff95eb474d62aec7b9ee8  src/http/http2_types.zen
+e0ee0bb0e2b3dfb681c55f10859ff231c36ff8bd1eecd1daf64cd3c434515cf1  src/http/server.zen
+f8c07fe4bbea184592e85d8794d84f7014ad7f623c9d94ddcf1967663af73336  src/http/transport.zen
+55a9caf8d0b384a0e64395b87d258cab918d510f2a8d901dd0ed50fb800e0839  src/transport.h
+25b627cac0d1dac442caef7cf3dff5b08957cee84d403fb700505391cd985d21  src/reactor.h
+44408dbbeac753a52c2f33ca8192ec2276e6dead0c903d443a1a3deb53fc5887  ../zen-crypto/src/tls.zen
+e12a57cf1bcf1170396a6130661ac6c4e387035bd76200052e18b82427ae8b5c  ../zen-crypto/src/zen_tls.h
+e79acf43e414a76023d00e11303afdbcbf0faae2644403068afeb7803e3dbf18  bench/uws.cpp
+3d2cfdb1e3f5210e48ab6b30eac393c0844ecf275a3bef26adf3f67dde9702a0  bench/load.go
+25da1ef566c6a80a3f883b3a3aaa7dc01e47146bae1068b6be7cf558e93fca07  build/zen.c
+c899ee5f4ff78169ca932aba9dba43bbada5795de5c8d4fd9741ba3b8b90fbbe  build/client.c
+5ced8916a48892b9318a738a1c8e68cf4271d3cebe6eafc6c5e9d708915b0608  build/zen-server
+3dd7cd10889ab90795cedcf1ada5899805baa9282d37f3fabab3bf974b0c1361  build/uws-server
+542436717bb31f3e113f599a38c0db25441239da21ed71541ac8301d8c7ab4a3  build/load
+d9d301bbb81b70a233a323daa806f5837e06b41a026514bc4ea41b2b35486318  /Users/lyndon/zen-dev/zen-http/build/openssl/lib/libssl.a
+0acecf3dc03c2166747fdb5899cda113d340112bf3245f1274303a5854a9a053  /Users/lyndon/zen-dev/zen-http/build/openssl/lib/libcrypto.a
+78ff79b10bd187dbef49011faa8e0275dd918bad41936c05ddffc4454e27b4c4  build/cert.pem

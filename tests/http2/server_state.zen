@@ -1,0 +1,76 @@
+H2StateError, H2_STREAM_LIMIT, h2_server_state = http.http2_server_state
+rejected = (
+    result : Res<(), H2StateError>
+) bool { result.match({ Ok(_) => false, Err(_) => true }) }
+main = (env: Env) Res<(), H2StateError> {
+    s ::= h2_server_state();
+    rejected(s.open(0, false)).ensure(H2StateError.Protocol).try();
+    rejected(s.open(2, false)).ensure(H2StateError.Protocol).try();
+    s.open(1, false).try();
+    s.open(3, false).try();
+    rejected(s.open(1, false)).ensure(H2StateError.Protocol).try();
+    s.receive_data(1, 100, true).try();
+    rejected(s.receive_data(1, 1, false)).ensure(H2StateError.Protocol).try();
+    (s.receive_window() == 65435).ensure(H2StateError.Protocol).try();
+    rejected(s.credit_stream(1, 101)).ensure(H2StateError.Protocol).try();
+    rejected(s.credit_connection(101)).ensure(H2StateError.Protocol).try();
+    s.credit_stream(1, 100).try();
+    s.credit_connection(100).try();
+    (s.receive_window() == 65535).ensure(H2StateError.Protocol).try();
+    s.send_data(1, 5, true).try();
+    rejected(s.send_data(1, 0, true)).ensure(H2StateError.Protocol).try();
+    s.release(1).try();
+    rejected(s.open(1, false)).ensure(H2StateError.Protocol).try();
+    println("stream lifecycle and receive credit pass");
+
+    s.send_data(3, 100, false).try();
+    s.set_initial_window(0).try();
+    (s.inspect(3).try().send_window == -100).ensure(H2StateError.Protocol).try();
+    rejected(s.send_data(3, 1, false)).ensure(H2StateError.Protocol).try();
+    s.update_stream(3, 100).try();
+    rejected(s.send_data(3, 1, false)).ensure(H2StateError.Protocol).try();
+    s.update_stream(3, 1).try();
+    s.send_data(3, 1, false).try();
+    s.open(5, true).try();
+    (s.inspect(5).try().send_window == 0).ensure(H2StateError.Protocol).try();
+    s.send_data(5, 0, true).try();
+    s.release(5).try();
+    rejected(s.update_stream(3, 0)).ensure(H2StateError.Protocol).try();
+    rejected(s.update_connection(0)).ensure(H2StateError.Protocol).try();
+    rejected(s.update_connection(2147483647)).ensure(H2StateError.Protocol).try();
+    s.update_stream(3, 2147483647).try();
+    rejected(s.set_initial_window(1)).ensure(H2StateError.Protocol).try();
+    (s.inspect(3).try().send_window == 2147483647).ensure(H2StateError.Protocol).try();
+    s.open(7, false).try();
+    (s.inspect(7).try().send_window == 0).ensure(H2StateError.Protocol).try();
+    println("signed windows and atomic settings pass");
+
+    s.begin_headers(7, false).try();
+    rejected(s.frame_allowed(3, false)).ensure(H2StateError.Protocol).try();
+    rejected(s.continue_headers(3, true)).ensure(H2StateError.Protocol).try();
+    rejected(s.receive_data(7, 0, false)).ensure(H2StateError.Protocol).try();
+    s.continue_headers(7, false).try();
+    s.continue_headers(7, true).try();
+    rejected(s.continue_headers(7, true)).ensure(H2StateError.Protocol).try();
+    s.receive_data(7, 65535, false).try();
+    rejected(s.receive_data(3, 1, false)).ensure(H2StateError.Protocol).try();
+    (s.inspect(3).try().receive_window == 65535).ensure(H2StateError.Protocol).try();
+    s.reset(7).try();
+    s.credit_connection(65535).try();
+    (s.receive_window() == 65535).ensure(H2StateError.Protocol).try();
+    println("continuation and reset accounting pass");
+
+    full ::= h2_server_state();
+    Range(0, H2_STREAM_LIMIT).loop((i) { full.open(i * 2 + 1, false).try(); });
+    rejected(full.open(65, false)).ensure(H2StateError.Protocol).try();
+    full.reset(1).try();
+    rejected(full.open(65, false)).ensure(H2StateError.Protocol).try();
+    full.open(67, true).try();
+    (full.drain() == 67).ensure(H2StateError.Protocol).try();
+    rejected(full.open(69, true)).ensure(H2StateError.Protocol).try();
+    (full.drain() == 67).ensure(H2StateError.Protocol).try();
+    full.send_data(67, 0, true).try();
+    full.release(67).try();
+    println("capacity reuse and draining pass");
+    Ok(())
+}

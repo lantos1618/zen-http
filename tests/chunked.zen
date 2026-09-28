@@ -1,0 +1,31 @@
+ChunkDecoder, ChunkError = http.chunked
+Ptr, null_ptr = std.mem
+str_at = std.text
+Failure = WrongBody | WrongCursor | Premature
+main = (env: Env) Res<(), AllocError | ChunkError | Failure> {
+    a         = env.mem.alloc();
+    wire: str = "3\r\nabc\r\nA\r\n0123456789\r\n0\r\nX-Checksum: yes\r\n\r\nNEXT";
+    terminal  = wire.len - 4;
+    input     = a.realloc<u8>(null_ptr<u8>(), 128).try();
+    Range(0, terminal + 1).loop((split) {
+        decoder ::= ChunkDecoder.start(0);
+        wire.slice(0, split).copy_into(input);
+        ready = decoder.advance(input, split, 0).try();
+        (ready == (split == terminal)).ensure(Failure.Premature).try();
+        // Repeated calls without new data must not consume or duplicate bytes.
+        (decoder.advance(input, split, 0).try() == ready).ensure(Failure.Premature).try();
+        wire.slice(split, wire.len).copy_into(input.offset(split));
+        (decoder.advance(input, wire.len, 0).try()).ensure(Failure.Premature).try();
+        (decoder.cursor == terminal).ensure(Failure.WrongCursor).try();
+        (str_at(input, decoder.decoded) == "abc0123456789").ensure(Failure.WrongBody).try();
+        (str_at(input.offset(terminal), 4) == "NEXT").ensure(Failure.WrongCursor).try();
+    });
+    decoder ::= ChunkDecoder.start(0);
+    Range(0, terminal).loop((i) {
+        wire.slice(i, i + 1).copy_into(input.offset(i));
+        (decoder.advance(input, i + 1, 0).try() == (i + 1 == terminal))
+            .ensure(Failure.Premature).try();
+    });
+    (str_at(input, decoder.decoded) == "abc0123456789").ensure(Failure.WrongBody).try();
+    Ok(())
+}

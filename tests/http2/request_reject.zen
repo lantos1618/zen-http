@@ -1,0 +1,290 @@
+H2RequestDecoder, h2_request_decoder = http.http2_request
+H2Error, H2Head = http.http2_types
+main = (env: Env) Res<(), H2Error> {
+    a = env.mem.alloc();
+    // uppercase
+    d0 ::= h2_request_decoder(
+        a
+    ).try(); b0 ::= a.String().try(H2Error.DecodeFailed);
+    [131, 135, 68, 132, 96, 164, 156, 255, 65, 137, 47, 145, 211, 93, 5, 93, 37, 66, 127, 64, 132, 252, 90, 232, 228, 129, 239].loop((v: u8) { b0.add(v).try(H2Error.DecodeFailed); });
+    rejected0 = d0.decode(
+        b0.view(),
+        a
+    ).match({ Ok(_) => false, Err(_) => true });
+    rejected0.ensure(H2Error.ProtocolFailed).try();
+    // pseudo ordering
+    d1 ::= h2_request_decoder(
+        a
+    ).try(); b1 ::= a.String().try(H2Error.DecodeFailed);
+    [64, 129, 243, 129, 239, 131, 135, 68, 132, 96, 164, 156, 255, 65, 137, 47, 145, 211, 93, 5, 93, 37, 66, 127].loop((v: u8) { b1.add(v).try(H2Error.DecodeFailed); });
+    rejected1 = d1.decode(
+        b1.view(),
+        a
+    ).match({ Ok(_) => false, Err(_) => true });
+    rejected1.ensure(H2Error.ProtocolFailed).try();
+    // duplicate method
+    d2 ::= h2_request_decoder(
+        a
+    ).try(); b2 ::= a.String().try(H2Error.DecodeFailed);
+    [131, 135, 68, 132, 96, 164, 156, 255, 65, 137, 47, 145, 211, 93, 5, 93, 37, 66, 127, 130].loop((v: u8) { b2.add(v).try(H2Error.DecodeFailed); });
+    rejected2 = d2.decode(
+        b2.view(),
+        a
+    ).match({ Ok(_) => false, Err(_) => true });
+    rejected2.ensure(H2Error.ProtocolFailed).try();
+    // unknown pseudo
+    d3 ::= h2_request_decoder(
+        a
+    ).try(); b3 ::= a.String().try(H2Error.DecodeFailed);
+    [131, 135, 68, 132, 96, 164, 156, 255, 65, 137, 47, 145, 211, 93, 5, 93, 37, 66, 127, 136].loop((v: u8) { b3.add(v).try(H2Error.DecodeFailed); });
+    rejected3 = d3.decode(
+        b3.view(),
+        a
+    ).match({ Ok(_) => false, Err(_) => true });
+    rejected3.ensure(H2Error.ProtocolFailed).try();
+    // missing method
+    d4 ::= h2_request_decoder(
+        a
+    ).try(); b4 ::= a.String().try(H2Error.DecodeFailed);
+    [135, 68, 132, 96, 164, 156, 255, 65, 137, 47, 145, 211, 93, 5, 93, 37, 66, 127].loop((v: u8) { b4.add(v).try(H2Error.DecodeFailed); });
+    rejected4 = d4.decode(
+        b4.view(),
+        a
+    ).match({ Ok(_) => false, Err(_) => true });
+    rejected4.ensure(H2Error.ProtocolFailed).try();
+    // CONNECT
+    d5 ::= h2_request_decoder(
+        a
+    ).try(); b5 ::= a.String().try(H2Error.DecodeFailed);
+    [66, 135, 189, 171, 78, 156, 23, 183, 255, 135, 68, 132, 96, 164, 156, 255, 65, 137, 47, 145, 211, 93, 5, 93, 37, 66, 127].loop((v: u8) { b5.add(v).try(H2Error.DecodeFailed); });
+    rejected5 = d5.decode(
+        b5.view(),
+        a
+    ).match({ Ok(_) => false, Err(_) => true });
+    rejected5.ensure(H2Error.ProtocolFailed).try();
+    // bad TE
+    d6 ::= h2_request_decoder(
+        a
+    ).try(); b6 ::= a.String().try(H2Error.DecodeFailed);
+    [131, 135, 68, 132, 96, 164, 156, 255, 65, 137, 47, 145, 211, 93, 5, 93, 37, 66, 127, 64, 130, 73, 127, 131, 155, 217, 171].loop((v: u8) { b6.add(v).try(H2Error.DecodeFailed); });
+    rejected6 = d6.decode(
+        b6.view(),
+        a
+    ).match({ Ok(_) => false, Err(_) => true });
+    rejected6.ensure(H2Error.ProtocolFailed).try();
+    // connection
+    d7 ::= h2_request_decoder(
+        a
+    ).try(); b7 ::= a.String().try(H2Error.DecodeFailed);
+    [131, 135, 68, 132, 96, 164, 156, 255, 65, 137, 47, 145, 211, 93, 5, 93, 37, 66, 127, 64, 135, 33, 234, 168, 164, 73, 143, 87, 132, 37, 7, 65, 127].loop((v: u8) { b7.add(v).try(H2Error.DecodeFailed); });
+    rejected7 = d7.decode(
+        b7.view(),
+        a
+    ).match({ Ok(_) => false, Err(_) => true });
+    rejected7.ensure(H2Error.ProtocolFailed).try();
+    // duplicate length
+    d8 ::= h2_request_decoder(
+        a
+    ).try(); b8 ::= a.String().try(H2Error.DecodeFailed);
+    [131, 135, 68, 132, 96, 164, 156, 255, 65, 137, 47, 145, 211, 93, 5, 93, 37, 66, 127, 92, 129, 15, 190].loop((v: u8) { b8.add(v).try(H2Error.DecodeFailed); });
+    rejected8 = d8.decode(
+        b8.view(),
+        a
+    ).match({ Ok(_) => false, Err(_) => true });
+    rejected8.ensure(H2Error.ProtocolFailed).try();
+    // negative length
+    d9 ::= h2_request_decoder(
+        a
+    ).try(); b9 ::= a.String().try(H2Error.DecodeFailed);
+    [131, 135, 68, 132, 96, 164, 156, 255, 65, 137, 47, 145, 211, 93, 5, 93, 37, 66, 127, 92, 130, 88, 63].loop((v: u8) { b9.add(v).try(H2Error.DecodeFailed); });
+    rejected9 = d9.decode(
+        b9.view(),
+        a
+    ).match({ Ok(_) => false, Err(_) => true });
+    rejected9.ensure(H2Error.ProtocolFailed).try();
+    // overflow length
+    d10 ::= h2_request_decoder(
+        a
+    ).try(); b10 ::= a.String().try(H2Error.DecodeFailed);
+    [131, 135, 68, 132, 96, 164, 156, 255, 65, 137, 47, 145, 211, 93, 5, 93, 37, 66, 127, 92, 151, 125, 247, 223, 125, 247, 223, 125, 247, 223, 125, 247, 223, 125, 247, 223, 125, 247, 223, 125, 247, 223, 125, 255].loop((v: u8) { b10.add(v).try(H2Error.DecodeFailed); });
+    rejected10 = d10.decode(
+        b10.view(),
+        a
+    ).match({ Ok(_) => false, Err(_) => true });
+    rejected10.ensure(H2Error.ProtocolFailed).try();
+    // leading whitespace
+    d11 ::= h2_request_decoder(
+        a
+    ).try(); b11 ::= a.String().try(H2Error.DecodeFailed);
+    [131, 135, 68, 132, 96, 164, 156, 255, 65, 137, 47, 145, 211, 93, 5, 93, 37, 66, 127, 64, 129, 243, 133, 83, 184, 232, 180, 191].loop((v: u8) { b11.add(v).try(H2Error.DecodeFailed); });
+    rejected11 = d11.decode(
+        b11.view(),
+        a
+    ).match({ Ok(_) => false, Err(_) => true });
+    rejected11.ensure(H2Error.ProtocolFailed).try();
+    // nul
+    d12 ::= h2_request_decoder(
+        a
+    ).try(); b12 ::= a.String().try(H2Error.DecodeFailed);
+    [131, 135, 68, 132, 96, 164, 156, 255, 65, 137, 47, 145, 211, 93, 5, 93, 37, 66, 127, 64, 129, 243, 131, 31, 254, 35].loop((v: u8) { b12.add(v).try(H2Error.DecodeFailed); });
+    rejected12 = d12.decode(
+        b12.view(),
+        a
+    ).match({ Ok(_) => false, Err(_) => true });
+    rejected12.ensure(H2Error.ProtocolFailed).try();
+    // bad name
+    d13 ::= h2_request_decoder(
+        a
+    ).try(); b13 ::= a.String().try(H2Error.DecodeFailed);
+    [131, 135, 68, 132, 96, 164, 156, 255, 65, 137, 47, 145, 211, 93, 5, 93, 37, 66, 127, 64, 131, 242, 167, 175, 129, 239].loop((v: u8) { b13.add(v).try(H2Error.DecodeFailed); });
+    rejected13 = d13.decode(
+        b13.view(),
+        a
+    ).match({ Ok(_) => false, Err(_) => true });
+    rejected13.ensure(H2Error.ProtocolFailed).try();
+    // too many
+    d14 ::= h2_request_decoder(
+        a
+    ).try(); b14 ::= a.String().try(H2Error.DecodeFailed);
+    [131, 135, 68, 132, 96, 164, 156, 255, 65, 137, 47, 145, 211, 93, 5, 93, 37, 66, 127, 64, 129, 243, 129, 239, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190].loop((v: u8) { b14.add(v).try(H2Error.DecodeFailed); });
+    rejected14 = d14.decode(
+        b14.view(),
+        a
+    ).match({ Ok(_) => false, Err(_) => true });
+    rejected14.ensure(H2Error.ProtocolFailed).try();
+    // decoded too large
+    d15 ::= h2_request_decoder(
+        a
+    ).try(); b15 ::= a.String().try(H2Error.DecodeFailed);
+    [131, 135, 68, 132, 96, 164, 156, 255, 65, 137, 47, 145, 211, 93, 5, 93, 37, 66, 127, 64, 129, 243, 255, 236, 5, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 247, 239, 223, 191, 126, 253, 251, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190].loop((v: u8) { b15.add(v).try(H2Error.DecodeFailed); });
+    rejected15 = d15.decode(
+        b15.view(),
+        a
+    ).match({ Ok(_) => false, Err(_) => true });
+    rejected15.ensure(H2Error.ProtocolFailed).try();
+    // zero index
+    d16 ::= h2_request_decoder(
+        a
+    ).try(); b16 ::= a.String().try(H2Error.DecodeFailed);
+    [128].loop((v: u8) { b16.add(v).try(H2Error.DecodeFailed); });
+    rejected16 = d16.decode(
+        b16.view(),
+        a
+    ).match({ Ok(_) => false, Err(_) => true });
+    rejected16.ensure(H2Error.ProtocolFailed).try();
+    // missing dynamic
+    d17 ::= h2_request_decoder(
+        a
+    ).try(); b17 ::= a.String().try(H2Error.DecodeFailed);
+    [190].loop((v: u8) { b17.add(v).try(H2Error.DecodeFailed); });
+    rejected17 = d17.decode(
+        b17.view(),
+        a
+    ).match({ Ok(_) => false, Err(_) => true });
+    rejected17.ensure(H2Error.ProtocolFailed).try();
+    // truncated string
+    d18 ::= h2_request_decoder(
+        a
+    ).try(); b18 ::= a.String().try(H2Error.DecodeFailed);
+    [0, 127].loop((v: u8) { b18.add(v).try(H2Error.DecodeFailed); });
+    rejected18 = d18.decode(
+        b18.view(),
+        a
+    ).match({ Ok(_) => false, Err(_) => true });
+    rejected18.ensure(H2Error.ProtocolFailed).try();
+    // integer overflow
+    d19 ::= h2_request_decoder(
+        a
+    ).try(); b19 ::= a.String().try(H2Error.DecodeFailed);
+    [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255].loop((v: u8) { b19.add(v).try(H2Error.DecodeFailed); });
+    rejected19 = d19.decode(
+        b19.view(),
+        a
+    ).match({ Ok(_) => false, Err(_) => true });
+    rejected19.ensure(H2Error.ProtocolFailed).try();
+    // oversized table
+    d20 ::= h2_request_decoder(
+        a
+    ).try(); b20 ::= a.String().try(H2Error.DecodeFailed);
+    [63, 226, 31].loop((v: u8) { b20.add(v).try(H2Error.DecodeFailed); });
+    rejected20 = d20.decode(
+        b20.view(),
+        a
+    ).match({ Ok(_) => false, Err(_) => true });
+    rejected20.ensure(H2Error.ProtocolFailed).try();
+    // late update
+    d21 ::= h2_request_decoder(
+        a
+    ).try(); b21 ::= a.String().try(H2Error.DecodeFailed);
+    [130, 32].loop((v: u8) { b21.add(v).try(H2Error.DecodeFailed); });
+    rejected21 = d21.decode(
+        b21.view(),
+        a
+    ).match({ Ok(_) => false, Err(_) => true });
+    rejected21.ensure(H2Error.ProtocolFailed).try();
+    // huffman eos
+    d22 ::= h2_request_decoder(
+        a
+    ).try(); b22 ::= a.String().try(H2Error.DecodeFailed);
+    [0, 132, 255, 255, 255, 255, 0].loop((v: u8) { b22.add(v).try(H2Error.DecodeFailed); });
+    rejected22 = d22.decode(
+        b22.view(),
+        a
+    ).match({ Ok(_) => false, Err(_) => true });
+    rejected22.ensure(H2Error.ProtocolFailed).try();
+    // bad method
+    d30 ::= h2_request_decoder(
+        a
+    ).try(); b30 ::= a.String().try(H2Error.DecodeFailed);
+    [66, 132, 196, 166, 13, 255, 135, 132, 65, 137, 47, 145, 211, 93, 5, 93, 37, 66, 127].loop((v: u8) { b30.add(v).try(H2Error.DecodeFailed); });
+    d30.decode(b30.view(), a).match({ Ok(_) => false, Err(_) => true }).ensure(H2Error.ProtocolFailed).try();
+    // bad path
+    d31 ::= h2_request_decoder(
+        a
+    ).try(); b31 ::= a.String().try(H2Error.DecodeFailed);
+    [130, 135, 68, 131, 97, 65, 255, 65, 137, 47, 145, 211, 93, 5, 93, 37, 66, 127].loop((v: u8) { b31.add(v).try(H2Error.DecodeFailed); });
+    d31.decode(b31.view(), a).match({ Ok(_) => false, Err(_) => true }).ensure(H2Error.ProtocolFailed).try();
+    // fragment path
+    d32 ::= h2_request_decoder(
+        a
+    ).try(); b32 ::= a.String().try(H2Error.DecodeFailed);
+    [130, 135, 68, 131, 99, 254, 165, 65, 137, 47, 145, 211, 93, 5, 93, 37, 66, 127].loop((v: u8) { b32.add(v).try(H2Error.DecodeFailed); });
+    d32.decode(b32.view(), a).match({ Ok(_) => false, Err(_) => true }).ensure(H2Error.ProtocolFailed).try();
+    // userinfo authority
+    d33 ::= h2_request_decoder(
+        a
+    ).try(); b33 ::= a.String().try(H2Error.DecodeFailed);
+    [130, 135, 132, 65, 131, 31, 254, 163].loop((v: u8) { b33.add(v).try(H2Error.DecodeFailed); });
+    d33.decode(b33.view(), a).match({ Ok(_) => false, Err(_) => true }).ensure(H2Error.ProtocolFailed).try();
+    // missing authority
+    d34 ::= h2_request_decoder(
+        a
+    ).try(); b34 ::= a.String().try(H2Error.DecodeFailed);
+    [130, 135, 132].loop((v: u8) { b34.add(v).try(H2Error.DecodeFailed); });
+    d34.decode(b34.view(), a).match({ Ok(_) => false, Err(_) => true }).ensure(H2Error.ProtocolFailed).try();
+    // mismatched host
+    d35 ::= h2_request_decoder(
+        a
+    ).try(); b35 ::= a.String().try(H2Error.DecodeFailed);
+    [130, 135, 132, 65, 137, 47, 145, 211, 93, 5, 93, 37, 66, 127, 102, 138, 144, 210, 202, 91, 11, 82, 87, 73, 80, 159].loop((v: u8) { b35.add(v).try(H2Error.DecodeFailed); });
+    d35.decode(b35.view(), a).match({ Ok(_) => false, Err(_) => true }).ensure(H2Error.ProtocolFailed).try();
+    // field control byte
+    d36 ::= h2_request_decoder(
+        a
+    ).try(); b36 ::= a.String().try(H2Error.DecodeFailed);
+    [130, 135, 132, 65, 137, 47, 145, 211, 93, 5, 93, 37, 66, 127, 64, 129, 243, 133, 31, 255, 253, 136, 255].loop((v: u8) { b36.add(v).try(H2Error.DecodeFailed); });
+    d36.decode(b36.view(), a).match({ Ok(_) => false, Err(_) => true }).ensure(H2Error.ProtocolFailed).try();
+    // field DEL byte
+    d37 ::= h2_request_decoder(
+        a
+    ).try(); b37 ::= a.String().try(H2Error.DecodeFailed);
+    [130, 135, 132, 65, 137, 47, 145, 211, 93, 5, 93, 37, 66, 127, 64, 129, 243, 133, 31, 255, 255, 254, 71].loop((v: u8) { b37.add(v).try(H2Error.DecodeFailed); });
+    d37.decode(b37.view(), a).match({ Ok(_) => false, Err(_) => true }).ensure(H2Error.ProtocolFailed).try();
+    // comma authority
+    d38 ::= h2_request_decoder(
+        a
+    ).try(); b38 ::= a.String().try(H2Error.DecodeFailed);
+    [130, 135, 132, 65, 131, 31, 212, 127].loop((v: u8) { b38.add(v).try(H2Error.DecodeFailed); });
+    d38.decode(b38.view(), a).match({ Ok(_) => false, Err(_) => true }).ensure(H2Error.ProtocolFailed).try();
+    println("malformed and limits pass"); Ok(())
+}

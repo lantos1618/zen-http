@@ -1,0 +1,210 @@
+// Bounded HTTP/2 server bookkeeping. This is not a frame dispatcher or server.
+Res, Range = std.core
+
+H2StateError* = Protocol | Closed | Refused | FlowControl | InvalidCredit
+H2_STREAM_LIMIT*: usize = 32
+H2_LIMIT: i64 = 2147483647
+H2StreamView* = { send_window*: i64, receive_window*: i64, pending_credit*: i64, remote_closed*: bool, local_closed*: bool }
+
+H2ServerState* = {
+    ids :: [usize, H2_STREAM_LIMIT],
+    send :: [i64, H2_STREAM_LIMIT],
+    receive :: [i64, H2_STREAM_LIMIT],
+    pending :: [i64, H2_STREAM_LIMIT],
+    remote :: [bool, H2_STREAM_LIMIT],
+    local :: [bool, H2_STREAM_LIMIT],
+    last :: usize,
+    accepted :: usize,
+    continuation :: usize,
+    initial_send :: i64,
+    connection_send :: i64,
+    connection_receive :: i64,
+    connection_pending :: i64,
+    draining :: bool,
+
+    slot = (self: @Self, sid: usize) Res<usize, H2StateError> {
+        (sid > 0).ensure(H2StateError.Protocol).try();
+        found ::= H2_STREAM_LIMIT;
+        Range(0, H2_STREAM_LIMIT).loop((i) {
+            (self.ids[i] == sid).then(() { found = i; });
+        });
+        (found < H2_STREAM_LIMIT).ensure(H2StateError.Closed).try();
+        Ok(found)
+    }
+
+    inspect* = (self: @Self, sid: usize) Res<H2StreamView, H2StateError> {
+        i = self.slot(sid).try();
+        Ok(H2StreamView(
+            send_window: self.send[i],
+            receive_window: self.receive[i],
+            pending_credit: self.pending[i],
+            remote_closed: self.remote[i],
+            local_closed: self.local[i]
+        ))
+    }
+
+    send_window* = (self: @Self) i64 { self.connection_send }
+    receive_window* = (self: @Self) i64 { self.connection_receive }
+    last_stream* = (self: @Self) usize { self.last }
+
+    // Call only after validating a new request's HEADERS. Refused IDs are
+    // consumed too, so they cannot later be reopened when capacity is freed.
+    open* = (self :: @Self, sid: usize, end_stream: bool) Res<(), H2StateError> {
+        (self.continuation == 0 && sid > self.last && sid % 2 == 1 && sid <= 2147483647).ensure(
+            H2StateError.Protocol
+        ).try();
+        self.last = sid;
+        (!self.draining).ensure(H2StateError.Refused).try();
+        free ::= H2_STREAM_LIMIT;
+        Range(0, H2_STREAM_LIMIT).loop((i) {
+            (self.ids[i] == 0 && free == H2_STREAM_LIMIT).then(
+                () { free = i; }
+            );
+        });
+        (free < H2_STREAM_LIMIT).ensure(H2StateError.Refused).try();
+        self.accepted      = sid;
+        self.ids[free]     = sid;
+        self.send[free]    = self.initial_send;
+        self.receive[free] = 65535;
+        self.pending[free] = 0;
+        self.remote[free]  = end_stream;
+        self.local[free]   = false;
+        Ok(())
+    }
+
+    // An unfinished header block prohibits every frame except CONTINUATION
+    // on its stream. The future wire dispatcher must call frame_allowed.
+    begin_headers* = (self :: @Self, sid: usize, end_headers: bool) Res<(), H2StateError> {
+        self.slot(sid).try();
+        (self.continuation == 0).ensure(H2StateError.Protocol).try();
+        (!end_headers).then(() { self.continuation = sid; });
+        Ok(())
+    }
+    frame_allowed* = (self: @Self, sid: usize, is_continuation: bool) Res<(), H2StateError> {
+        valid = (self.continuation == 0 && !is_continuation) || (self.continuation != 0 && is_continuation && sid == self.continuation);
+        valid.ensure(H2StateError.Protocol)
+    }
+    continue_headers* = (self :: @Self, sid: usize, end_headers: bool) Res<(), H2StateError> {
+        self.frame_allowed(sid, true).try();
+        end_headers.then(() { self.continuation = 0; });
+        Ok(())
+    }
+
+    // Count the full DATA payload, including the pad length byte and padding.
+    receive_data* = (self :: @Self, sid: usize, bytes: i64, end_stream: bool) Res<(), H2StateError> {
+        self.frame_allowed(sid, false).try();
+        i = self.slot(sid).try();
+        (!self.remote[i]).ensure(H2StateError.Closed).try();
+        (bytes >= 0 && bytes <= self.receive[i] && bytes <= self.connection_receive).ensure(
+            H2StateError.FlowControl
+        ).try();
+        self.receive[i]         = self.receive[i] - bytes;
+        self.connection_receive = self.connection_receive - bytes;
+        self.pending[i]         = self.pending[i] + bytes;
+        self.connection_pending = self.connection_pending + bytes;
+        self.remote[i]          = end_stream;
+        Ok(())
+    }
+
+    // Credit is independent for stream and connection. Credit only consumed
+    // or deliberately discarded bytes, and emit the corresponding WINDOW_UPDATE.
+    credit_stream* = (self :: @Self, sid: usize, bytes: i64) Res<(), H2StateError> {
+        i = self.slot(sid).try();
+        (bytes > 0 && bytes <= self.pending[i] && bytes <= H2_LIMIT - self.receive[i]).ensure(
+            H2StateError.InvalidCredit
+        ).try();
+        self.pending[i] = self.pending[i] - bytes;
+        self.receive[i] = self.receive[i] + bytes;
+        Ok(())
+    }
+    credit_connection* = (self :: @Self, bytes: i64) Res<(), H2StateError> {
+        (bytes > 0 && bytes <= self.connection_pending && bytes <= H2_LIMIT - self.connection_receive).ensure(
+            H2StateError.InvalidCredit
+        ).try();
+        self.connection_pending = self.connection_pending - bytes;
+        self.connection_receive = self.connection_receive + bytes;
+        Ok(())
+    }
+
+    // Reserve bytes only when committing a DATA frame to the output queue.
+    send_data* = (self :: @Self, sid: usize, bytes: i64, end_stream: bool) Res<(), H2StateError> {
+        i = self.slot(sid).try();
+        (!self.local[i]).ensure(H2StateError.Closed).try();
+        (bytes >= 0 && (bytes == 0 || (bytes <= self.send[i] && bytes <= self.connection_send))).ensure(
+            H2StateError.FlowControl
+        ).try();
+        self.send[i]         = self.send[i] - bytes;
+        self.connection_send = self.connection_send - bytes;
+        self.local[i]        = end_stream;
+        Ok(())
+    }
+    update_connection* = (self :: @Self, increment: i64) Res<(), H2StateError> {
+        (increment > 0 && increment <= H2_LIMIT - self.connection_send).ensure(
+            H2StateError.FlowControl
+        ).try();
+        self.connection_send = self.connection_send + increment;
+        Ok(())
+    }
+    update_stream* = (self :: @Self, sid: usize, increment: i64) Res<(), H2StateError> {
+        i = self.slot(sid).try();
+        (increment > 0 && increment <= H2_LIMIT && increment <= H2_LIMIT - self.send[i]).ensure(
+            H2StateError.FlowControl
+        ).try();
+        self.send[i] = self.send[i] + increment;
+        Ok(())
+    }
+    // SETTINGS_INITIAL_WINDOW_SIZE can make stream send windows negative.
+    // Validate every stream first, so a rejected setting changes no window.
+    set_initial_window* = (self :: @Self, value: i64) Res<(), H2StateError> {
+        (value >= 0 && value <= H2_LIMIT).ensure(
+            H2StateError.FlowControl
+        ).try();
+        delta = value - self.initial_send;
+        Range(0, H2_STREAM_LIMIT).loop((i) {
+            (self.ids[i] != 0).then(() {
+                (self.send[i] + delta <= H2_LIMIT).ensure(
+                    H2StateError.FlowControl
+                ).try();
+            });
+        });
+        Range(0, H2_STREAM_LIMIT).loop((i) {
+            (self.ids[i] != 0).then(
+                () { self.send[i] = self.send[i] + delta; }
+            );
+        });
+        self.initial_send = value;
+        Ok(())
+    }
+    reset* = (self :: @Self, sid: usize) Res<(), H2StateError> {
+        i           = self.slot(sid).try();
+        self.ids[i] = 0;
+        // Connection pending credit survives stream reset.
+        Ok(())
+    }
+    release* = (self :: @Self, sid: usize) Res<(), H2StateError> {
+        i = self.slot(sid).try();
+        (self.remote[i] && self.local[i]).ensure(H2StateError.Protocol).try();
+        self.ids[i] = 0;
+        Ok(())
+    }
+    drain* = (self :: @Self) usize { self.draining = true; self.accepted }
+}
+
+h2_server_state* = () H2ServerState {
+    H2ServerState(
+        ids: [usize, H2_STREAM_LIMIT](),
+        send: [i64, H2_STREAM_LIMIT](),
+        receive: [i64, H2_STREAM_LIMIT](),
+        pending: [i64, H2_STREAM_LIMIT](),
+        remote: [bool, H2_STREAM_LIMIT](),
+        local: [bool, H2_STREAM_LIMIT](),
+        last: 0,
+        accepted: 0,
+        continuation: 0,
+        initial_send: 65535,
+        connection_send: 65535,
+        connection_receive: 65535,
+        connection_pending: 0,
+        draining: false
+    )
+}

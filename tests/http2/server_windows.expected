@@ -1,0 +1,3 @@
+independent send limits and no partial reservation pass
+settings rollback and empty DATA at negative window pass
+credit scopes and live-stream release rejection pass

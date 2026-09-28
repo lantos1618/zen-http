@@ -1,0 +1,5 @@
+// HTTP/2 client API.
+
+H2Error*, H2StreamError*, H2Response*, H2Head*, H2Chunk*, MAX_SEND*, h2_chunk* = http.http2_types
+H2Client*, post_once* = http.http2_client
+huf_decode*, hpack_status* = http.http2_hpack

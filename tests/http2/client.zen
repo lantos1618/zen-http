@@ -1,0 +1,30 @@
+H2Client, H2Error = http
+Failure = WrongResponse | Unexpected
+main = (env: Env) Res<(), AllocError | H2Error | Failure> {
+    a      = env.mem.alloc();
+    secure = env.argv.find(
+        (arg) { arg == "--tls" }
+    ).match({Ok(_) => true, None => false});
+    url    = secure.match({true => "https://localhost:18081/echo", false => "http://127.0.0.1:18081/echo"});
+    reject = env.argv.find(
+        (arg) { arg == "--reject" }
+    ).match({Ok(_) => true, None => false});
+    result = H2Client.connect(a, url);
+    reject.then(() {
+        result.match({Ok(_) => Err(Failure.Unexpected), Err(_) => Ok(())}).try();
+    });
+    reject.match({
+        true  => Ok(()),
+        false => {
+    client ::= result.try();
+    ["", "native Zen HTTP/2", "second stream"].loop((body) {
+        response = client.post(a, a.Vec<str>(), body).try();
+        (response.status == 200 && response.body.view() == body).ensure(
+            Failure.WrongResponse
+        ).try();
+    });
+    client.close(a);
+    Ok(())
+        },
+    })
+}

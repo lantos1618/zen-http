@@ -1,0 +1,24 @@
+Darwin Lyndons-MacBook-Pro.local 25.6.0 Darwin Kernel Version 25.6.0: Fri Jul 31 19:18:48 PDT 2026; root:xnu-12377.161.14~5/RELEASE_ARM64_T6020 arm64
+Apple clang version 17.0.0 (clang-1700.6.4.2)
+Target: arm64-apple-darwin25.6.0
+Thread model: posix
+InstalledDir: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin
+go version go1.27.1 darwin/arm64
+OpenSSL 3.5.4 30 Sep 2025 (Library: OpenSSL 3.5.4 30 Sep 2025)
+4e7578d175fcb6d2f5b3ae7ad7b13ce14f4309d8
+86097c490263ab662d62e8e7b541390bdec7d149
+9002dd623593137bff217d39a06f5ac985ad5852803320b7421e5c0c0c3be5b2  /Users/lyndon/zen-dev/zen-http/../zen-actor-runtime/zen
+c8cf5708a9efcad570622239a1ea10d574782b9f04106c05fffdddc7d5a371f0  src/http/client.zen
+eabd62f190d8611692ed70ea3ddc43bbaf93c7763c2dcc9a45a2065363cacc8b  src/http/client_decode.zen
+63fd8d73eb279149ac8f8e3e819068881137837a628c029dce3b8c5c824c58b2  src/http/client_types.zen
+a7684fa239c61f46e2b1322a2bae71fe77436145d96fa419e1e2933da4b42603  src/http/http.zen
+925a7507be94e944ce155e6555a53f6eccd2cfd204a0845ac2fd41264fdb7e33  src/http/server.zen
+f009361e8ba96fc7aaab462231724bde916f2d509ad639a59199a0031a7d28a6  src/transport.h
+f071f16b6129684dd2baf5d563e23142cd901b5e153d5b9381149af92641f930  src/reactor.h
+a3954fe1470fb0adc17aea3cfc703b918cd006b33f2ae998d1d0da6ee2af1a81  ../zen-crypto/src/tls.zen
+c497b93d81ca00d48ae953f8bf9c893fb4ada453413957a772affaa3064cb982  ../zen-crypto/src/zen_tls.h
+e79acf43e414a76023d00e11303afdbcbf0faae2644403068afeb7803e3dbf18  bench/uws.cpp
+62255a29b02af4bb89aa58d42cd418d015eac95df50e476f81b799648376896b  bench/load.go
+d48b2fda850bdbd5d687fdbd91630162c6443f2f9732b9bf70b308a87cc3c121  build/zen-server
+3dd7cd10889ab90795cedcf1ada5899805baa9282d37f3fabab3bf974b0c1361  build/uws-server
+5d3f5258553638aa06c78c03ffe1a6049de71d524d0c72b6d20849ff0f43cc9b  build/load

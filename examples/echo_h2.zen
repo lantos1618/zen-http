@@ -1,0 +1,5 @@
+serve_h2 = http.http2_server
+H2Error, MAX_SEND = http.http2_types
+main = (env: Env) Res<(), H2Error | AllocError> {
+    serve_h2(env)
+}

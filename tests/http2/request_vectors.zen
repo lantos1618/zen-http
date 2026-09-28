@@ -1,0 +1,50 @@
+// Generated with independent python-hpack 4.1.0; alternating Huffman/raw,
+// dynamic indexed fields/names, evictions, shrink then growth.
+H2RequestDecoder, h2_request_decoder = http.http2_request
+H2Error, H2Head = http.http2_types
+main = (env: Env) Res<(), H2Error> {
+    a = env.mem.alloc(); decoder ::= h2_request_decoder(a).try();
+    b0 ::= a.String().try(H2Error.DecodeFailed);
+    [131, 135, 68, 5, 47, 101, 99, 104, 111, 65, 12, 101, 120, 97, 109, 112, 108, 101, 46, 116, 101, 115, 116, 92, 1, 48, 64, 13, 120, 45, 115, 104, 97, 114, 101, 100, 45, 110, 97, 109, 101, 2, 97, 48, 64, 6, 120, 45, 102, 105, 108, 108, 127, 189, 4, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122, 122].loop((v: u8) { b0.add(v).try(H2Error.DecodeFailed); });
+    h0 = decoder.decode(b0.view(), a).try();
+    (h0.method.eq("POST") && h0.path.eq("/echo") && h0.authority.eq("example.test") && h0.content_length.value_or(99) == 0).ensure(H2Error.ProtocolFailed).try();
+    b1 ::= a.String().try(H2Error.DecodeFailed);
+    [131, 135, 194, 193, 92, 129, 15, 127, 1, 130, 24, 127, 192].loop((v: u8) { b1.add(v).try(H2Error.DecodeFailed); });
+    h1 = decoder.decode(b1.view(), a).try();
+    (h1.method.eq("POST") && h1.path.eq("/echo") && h1.authority.eq("example.test") && h1.content_length.value_or(99) == 1).ensure(H2Error.ProtocolFailed).try();
+    b2 ::= a.String().try(H2Error.DecodeFailed);
+    [131, 135, 196, 195, 92, 1, 50, 127, 0, 2, 97, 50, 194].loop((v: u8) { b2.add(v).try(H2Error.DecodeFailed); });
+    h2 = decoder.decode(b2.view(), a).try();
+    (h2.method.eq("POST") && h2.path.eq("/echo") && h2.authority.eq("example.test") && h2.content_length.value_or(99) == 2).ensure(H2Error.ProtocolFailed).try();
+    b3 ::= a.String().try(H2Error.DecodeFailed);
+    [131, 135, 198, 197, 92, 129, 103, 127, 0, 130, 27, 63, 196].loop((v: u8) { b3.add(v).try(H2Error.DecodeFailed); });
+    h3 = decoder.decode(b3.view(), a).try();
+    (h3.method.eq("POST") && h3.path.eq("/echo") && h3.authority.eq("example.test") && h3.content_length.value_or(99) == 3).ensure(H2Error.ProtocolFailed).try();
+    b4 ::= a.String().try(H2Error.DecodeFailed);
+    [131, 135, 200, 199, 92, 1, 52, 127, 0, 2, 97, 52, 198].loop((v: u8) { b4.add(v).try(H2Error.DecodeFailed); });
+    h4 = decoder.decode(b4.view(), a).try();
+    (h4.method.eq("POST") && h4.path.eq("/echo") && h4.authority.eq("example.test") && h4.content_length.value_or(99) == 4).ensure(H2Error.ProtocolFailed).try();
+    b5 ::= a.String().try(H2Error.DecodeFailed);
+    [131, 135, 202, 201, 92, 129, 111, 127, 0, 130, 27, 127, 200].loop((v: u8) { b5.add(v).try(H2Error.DecodeFailed); });
+    h5 = decoder.decode(b5.view(), a).try();
+    (h5.method.eq("POST") && h5.path.eq("/echo") && h5.authority.eq("example.test") && h5.content_length.value_or(99) == 5).ensure(H2Error.ProtocolFailed).try();
+    b6 ::= a.String().try(H2Error.DecodeFailed);
+    [131, 135, 204, 203, 92, 1, 54, 127, 0, 2, 97, 54, 202].loop((v: u8) { b6.add(v).try(H2Error.DecodeFailed); });
+    h6 = decoder.decode(b6.view(), a).try();
+    (h6.method.eq("POST") && h6.path.eq("/echo") && h6.authority.eq("example.test") && h6.content_length.value_or(99) == 6).ensure(H2Error.ProtocolFailed).try();
+    b7 ::= a.String().try(H2Error.DecodeFailed);
+    [131, 135, 206, 205, 92, 129, 119, 127, 0, 130, 27, 191, 204].loop((v: u8) { b7.add(v).try(H2Error.DecodeFailed); });
+    h7 = decoder.decode(b7.view(), a).try();
+    (h7.method.eq("POST") && h7.path.eq("/echo") && h7.authority.eq("example.test") && h7.content_length.value_or(99) == 7).ensure(H2Error.ProtocolFailed).try();
+    b8 ::= a.String().try(H2Error.DecodeFailed);
+    [63, 33, 131, 135, 68, 132, 96, 164, 156, 255, 65, 137, 47, 145, 211, 93, 5, 93, 37, 66, 127, 92, 129, 123].loop((v: u8) { b8.add(v).try(H2Error.DecodeFailed); });
+    h8 = decoder.decode(b8.view(), a).try();
+    (h8.method.eq("POST") && h8.path.eq("/echo") && h8.authority.eq("example.test") && h8.content_length.value_or(99) == 8).ensure(H2Error.ProtocolFailed).try();
+    b9 ::= a.String().try(H2Error.DecodeFailed);
+    [63, 225, 31, 131, 135, 68, 132, 96, 164, 156, 255, 65, 137, 47, 145, 211, 93, 5, 93, 37, 66, 127, 92, 129, 127].loop((v: u8) { b9.add(v).try(H2Error.DecodeFailed); });
+    h9 = decoder.decode(b9.view(), a).try();
+    (h9.method.eq("POST") && h9.path.eq("/echo") && h9.authority.eq("example.test") && h9.content_length.value_or(99) == 9).ensure(H2Error.ProtocolFailed).try();
+    // Earlier heads own request-allocator copies despite later table changes.
+    (h0.authority.eq("example.test") && h0.path.eq("/echo")).ensure(H2Error.ProtocolFailed).try();
+    println("independent HPACK vectors pass"); Ok(())
+}

@@ -1,0 +1,23 @@
+H2RequestDecoder, h2_request_decoder = http.http2_request
+H2Error, H2Head = http.http2_types
+block_add_header, Header = http.http2_hpack
+main = (env: Env) Res<(), H2Error> {
+    a = env.mem.alloc(); decoder ::= h2_request_decoder(a).try();
+    block ::= a.String().try(H2Error.DecodeFailed);
+    block.block_add_header(":method", "POST").try();
+    block.block_add_header(":scheme", "https").try();
+    block.block_add_header(":path", "/echo").try();
+    block.block_add_header(":authority", "example.test").try();
+    block.block_add_header("content-length", "12").try();
+    head = decoder.decode(block.view(), a).try();
+    (head.method.eq("POST") && head.path.eq("/echo") && head.content_length.value_or(0) == 12).ensure(H2Error.ProtocolFailed).try();
+    fallback ::= a.String().try(H2Error.DecodeFailed);
+    fallback.block_add_header(":method", "OPTIONS").try();
+    fallback.block_add_header(":scheme", "http").try();
+    fallback.block_add_header(":path", "*").try();
+    fallback.block_add_header("host", "example.test").try();
+    fallback.block_add_header("te", "trailers").try();
+    fh = decoder.decode(fallback.view(), a).try();
+    (fh.authority.eq("example.test") && fh.path.eq("*")).ensure(H2Error.ProtocolFailed).try();
+    println("request decode pass"); Ok(())
+}

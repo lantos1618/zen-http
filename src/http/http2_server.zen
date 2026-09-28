@@ -1,0 +1,437 @@
+// Experimental bounded prior-knowledge h2c echo endpoint. Protocol logic is Zen.
+Alloc, Ptr, null_ptr = std.mem
+str_at = std.text
+H2Error, MAX_SEND = http.http2_types
+H2ServerState, h2_server_state = http.http2_server_state
+H2RequestDecoder, H2RequestHead, h2_request_decoder = http.http2_request
+transport_io, resume_read, transport_h2_selected = http.transport
+ServerContext, TlsFault = tls
+Native = c.bind("reactor.h", {
+    zen_http_listen = (host: Ptr<u8>, port: u16, context: Ptr<()>) Ptr<()>
+    zen_http_listener_close = (listener: Ptr<()>) ()
+    zen_http_accept = (listener: Ptr<()>) Ptr<()>
+    zen_http_close = (transport: Ptr<()>) ()
+    zen_http_seconds = () u64
+    zen_http_reactor_new = (listener: Ptr<()>) Ptr<()>
+    zen_http_reactor_free = (reactor: Ptr<()>) ()
+    zen_http_watch = (reactor: Ptr<()>, transport: Ptr<()>, slot: usize) i32
+    zen_http_wait_timeout = (reactor: Ptr<()>, timeout: i32) i32
+})
+be = (p: Ptr<u8>, n: usize) usize {
+    value ::= 0;
+    Range(0, n).loop((i) { value = value * 256 + p.read(i).to_usize(); });
+    value
+}
+put = (p: Ptr<u8>, n: usize, value: usize) {
+    v ::= value;
+    Range(0, n).loop((i) {
+        p.write(n - i - 1, (v % 256).to_u8().value_or(0));
+        v = v / 256;
+    });
+}
+flag = (flags: u8, bit: u8) bool { flags / bit % 2 == 1 }
+Wire = {
+    transport: Ptr<()>, reactor: Ptr<()>, listener: Ptr<()>, header: Ptr<u8>, output: Ptr<u8>,
+    transfer = (self: @Self, bytes: Ptr<u8>, size: usize, writing: i32) Res<(), H2Error> {
+        done ::= 0;
+        started = Native.zen_http_seconds();
+        loop(done < size, (h) {
+            n = transport_io(
+                self.transport,
+                bytes.offset(done),
+                size - done,
+                writing
+            );
+            (n == -2).match({
+                true  => {
+                    (Native.zen_http_seconds() - started < 10).ensure(
+                        H2Error.Closed
+                    ).try();
+                    (Native.zen_http_watch(self.reactor, self.transport, 0) == 0).ensure(H2Error.Closed).try();
+                    Range(0, 16).loop((accept_loop, unused) {
+                        extra = Native.zen_http_accept(self.listener);
+                        extra.is_null().then(() { accept_loop.break(0); });
+                        Native.zen_http_close(extra);
+                    });
+                    (Native.zen_http_wait_timeout(self.reactor, 100) >= 0).ensure(H2Error.Closed).try();
+                },
+                false => {
+                    (n > 0).ensure(H2Error.Closed).try();
+                    done = done + n.to_usize().ok_or(H2Error.Closed).try();
+                },
+            });
+        });
+        Ok(())
+    }
+    frame = (self: @Self, kind: u8, flags: u8, sid: usize, payload: Ptr<u8>, size: usize) Res<(), H2Error> {
+        put(self.output, 3, size);
+        self.output.write(3, kind); self.output.write(4, flags);
+        put(self.output.offset(5), 4, sid);
+        (size > 0).then(() { self.output.offset(9).copy_from(payload, size); });
+        self.transfer(self.output, size + 9, 1)
+    }
+    number = (self: @Self, kind: u8, sid: usize, value: usize) Res<(), H2Error> {
+        put(self.header, 4, value);
+        self.frame(kind, 0, sid, self.header, 4)
+    }
+    goaway = (self: @Self, last: usize, code: usize) Res<(), H2Error> {
+        put(self.header, 4, last); put(self.header.offset(4), 4, code);
+        self.frame(7, 0, 0, self.header, 8)
+    }
+}
+Session = {
+    alloc: Alloc, state :: H2ServerState,
+    decoder :: H2RequestDecoder,
+    ids :: [usize, 32], lengths :: [usize, 32], sent :: [usize, 32],
+    expected :: [usize, 32], has_expected :: [bool, 32], ready :: [bool, 32],
+    ok :: [bool, 32], headers_sent :: [bool, 32],
+    bodies: Ptr<u8>, block: Ptr<u8>, block_len :: usize,
+    header_sid :: usize, header_end :: bool, requests :: usize,
+    wire: Wire,
+    slot = (self: @Self, sid: usize) Res<usize, H2Error> {
+        found ::= 32;
+        Range(0, 32).loop((i) { (self.ids[i] == sid).then(() { found = i; }); });
+        (found < 32 && sid != 0).ensure(H2Error.ProtocolFailed).try();
+        Ok(found)
+    }
+    head = (self :: @Self) Res<(), H2Error> {
+        request    = self.decoder.decode(
+            str_at(self.block, self.block_len),
+            self.alloc
+        ).try();
+        i          = self.slot(self.header_sid).try();
+        self.ok[i] = request.method == "POST" && request.path == "/echo";
+        request.content_length.match({
+            Ok(n) => { (n <= 65536).ensure(
+                H2Error.ProtocolFailed
+            ).try(); self.expected[i] = n; self.has_expected[i] = true; },
+            None  => (),
+        });
+        self.ready[i]   = self.header_end;
+        self.header_sid = 0; self.block_len = 0;
+        Ok(())
+    }
+    flush = (self :: @Self) Res<(), H2Error> {
+        Range(0, 32).loop((i) {
+            (self.ids[i] != 0 && self.ready[i]).then(() {
+                (!self.headers_sent[i]).then(() {
+                    (!self.has_expected[i] || self.expected[i] == self.lengths[i]).ensure(
+                        H2Error.ProtocolFailed
+                    ).try();
+                    self.wire.header.write(
+                        0,
+                        self.ok[i].match({true => 136, false => 141})
+                    );
+                    self.wire.frame(
+                        1,
+                        4,
+                        self.ids[i],
+                        self.wire.header,
+                        1
+                    ).try();
+                    self.headers_sent[i] = true;
+                    (!self.ok[i]).then(
+                        () { "not found".copy_into(self.bodies.offset(
+                            i * 65536
+                        )); self.lengths[i] = 9; }
+                    );
+                });
+                loop((h) {
+                    left   = self.lengths[i] - self.sent[i];
+                    view   = self.state.inspect(
+                        self.ids[i]
+                    ).try(H2Error.ProtocolFailed);
+                    window = (self.state.send_window() < view.send_window).match({true => self.state.send_window(), false => view.send_window});
+                    (left > 0 && window <= 0).then(() { h.break(); });
+                    n   = left.min(16384).min(window.to_usize().value_or(0));
+                    end = n == left;
+                    self.state.send_data(
+                        self.ids[i],
+                        n.to_u64().to_i32().ok_or(
+                            H2Error.ProtocolFailed
+                        ).try().to_i64(),
+                        end
+                    ).try(H2Error.ProtocolFailed);
+                    self.wire.frame(
+                        0,
+                        end.match({true => 1, false => 0}),
+                        self.ids[i],
+                        self.bodies.offset(i * 65536 + self.sent[i]),
+                        n
+                    ).try();
+                    self.sent[i] = self.sent[i] + n;
+                    end.then(() {
+                        self.state.release(
+                            self.ids[i]
+                        ).try(H2Error.ProtocolFailed);
+                        self.ids[i] = 0; h.break();
+                    });
+                });
+            });
+        });
+        Ok(())
+    }
+    dispatch = (self :: @Self, kind: u8, flags: u8, sid: usize, p: Ptr<u8>, n: usize) Res<bool, H2Error> {
+        self.state.frame_allowed(sid, kind == 9).try(H2Error.ProtocolFailed);
+        (kind == 4).then(() {
+            (sid == 0 && n % 6 == 0).ensure(H2Error.ProtocolFailed).try();
+            flag(flags, 1).match({
+                true  => { (n == 0).ensure(H2Error.ProtocolFailed).try(); },
+                false => {
+                    Range(0, n / 6).loop((i) {
+                        id = be(p.offset(i * 6), 2); value = be(p.offset(i * 6 + 2), 4);
+                        (id == 2).then(
+                            () { (value <= 1).ensure(
+                                H2Error.ProtocolFailed
+                            ).try(); }
+                        );
+                        (id == 4).then(
+                            () { self.state.set_initial_window(
+                                value.to_u64().to_i32().ok_or(
+                                    H2Error.ProtocolFailed
+                                ).try().to_i64()
+                            ).try(H2Error.ProtocolFailed); }
+                        );
+                        (id == 5).then(
+                            () { (value >= 16384 && value <= 16777215).ensure(
+                                H2Error.ProtocolFailed
+                            ).try(); }
+                        );
+                    });
+                    self.wire.frame(4, 1, 0, p, 0).try();
+                },
+            });
+        });
+        (kind == 6).then(() {
+            (sid == 0 && n == 8).ensure(H2Error.ProtocolFailed).try();
+            (!flag(flags, 1)).then(() { self.wire.frame(6, 1, 0, p, 8).try(); });
+        });
+        (kind == 8).then(() {
+            (n == 4).ensure(H2Error.ProtocolFailed).try();
+            increment = (be(p, 4) % 2147483648).to_u64().to_i32().ok_or(H2Error.ProtocolFailed).try().to_i64();
+            (sid == 0).match({
+                true  => self.state.update_connection(
+                    increment
+                ).try(H2Error.ProtocolFailed),
+                false => self.state.inspect(sid).match({
+                    Ok(_)  => self.state.update_stream(
+                        sid,
+                        increment
+                    ).try(H2Error.ProtocolFailed),
+                    Err(_) => { (sid <= self.state.last_stream()).ensure(
+                        H2Error.ProtocolFailed
+                    ).try(); },
+                }),
+            });
+        });
+        (kind == 3).then(() {
+            (sid != 0 && n == 4 && sid <= self.state.last_stream()).ensure(
+                H2Error.ProtocolFailed
+            ).try();
+            self.slot(sid).match({Ok(i) => { self.state.reset(sid).try(H2Error.ProtocolFailed); self.ids[i] = 0; }, Err(_) => ()});
+        });
+        (kind == 2).then(() {
+            (sid != 0 && n == 5 && be(p, 4) % 2147483648 != sid).ensure(H2Error.ProtocolFailed).try();
+        });
+        (kind == 5).then(() { false.ensure(H2Error.ProtocolFailed).try(); });
+        (kind == 1 || kind == 9).then(() {
+            (sid != 0).ensure(H2Error.ProtocolFailed).try();
+            start ::= 0; padding ::= 0;
+            (kind == 1).then(() {
+                (self.requests < 128).ensure(H2Error.ProtocolFailed).try();
+                self.state.open(
+                    sid,
+                    flag(flags, 1)
+                ).try(H2Error.ProtocolFailed);
+                self.state.begin_headers(
+                    sid,
+                    flag(flags, 4)
+                ).try(H2Error.ProtocolFailed);
+                free ::= 32;
+                Range(0, 32).loop((i) { (self.ids[i] == 0 && free == 32).then(() { free = i; }); });
+                (free < 32).ensure(H2Error.ProtocolFailed).try();
+                self.ids[free] = sid; self.lengths[free] = 0; self.sent[free] = 0;
+                self.has_expected[free] = false; self.ready[free] = false; self.headers_sent[free] = false;
+                self.header_sid = sid; self.header_end = flag(
+                    flags,
+                    1
+                ); self.block_len = 0;
+                self.requests = self.requests + 1;
+                flag(flags, 8).then(() { (n > 0).ensure(H2Error.ProtocolFailed).try(); padding = p.read(0).to_usize(); start = 1; });
+                flag(flags, 32).then(() {
+                    (n >= start + 5).ensure(H2Error.ProtocolFailed).try();
+                    (be(p.offset(start), 4) % 2147483648 != sid).ensure(H2Error.ProtocolFailed).try();
+                    start = start + 5;
+                });
+            });
+            (kind == 9).then(
+                () { self.state.continue_headers(
+                    sid,
+                    flag(flags, 4)
+                ).try(H2Error.ProtocolFailed); }
+            );
+            (start + padding <= n && n - start - padding <= 8192 - self.block_len).ensure(
+                H2Error.ProtocolFailed
+            ).try();
+            size = n - start - padding;
+            self.block.offset(self.block_len).copy_from(p.offset(start), size);
+            self.block_len = self.block_len + size;
+            flag(flags, 4).then(() { self.head().try(); });
+        });
+        (kind == 0).then(() {
+            i = self.slot(sid).try();
+            start ::= 0; padding ::= 0;
+            flag(flags, 8).then(() { (n > 0).ensure(H2Error.ProtocolFailed).try(); start = 1; padding = p.read(0).to_usize(); });
+            (start + padding <= n).ensure(H2Error.ProtocolFailed).try();
+            size = n - start - padding;
+            (size <= 65536 - self.lengths[i]).ensure(
+                H2Error.ProtocolFailed
+            ).try();
+            self.state.receive_data(
+                sid,
+                n.to_u64().to_i32().ok_or(
+                    H2Error.ProtocolFailed
+                ).try().to_i64(),
+                flag(flags, 1)
+            ).try(H2Error.ProtocolFailed);
+            self.bodies.offset(i * 65536 + self.lengths[i]).copy_from(p.offset(start), size);
+            self.lengths[i] = self.lengths[i] + size; self.ready[i] = flag(
+                flags,
+                1
+            );
+            (n > 0).then(() {
+                self.state.credit_connection(
+                    n.to_u64().to_i32().ok_or(
+                        H2Error.ProtocolFailed
+                    ).try().to_i64()
+                ).try(H2Error.ProtocolFailed);
+                self.wire.number(8, 0, n).try();
+                self.state.credit_stream(
+                    sid,
+                    n.to_u64().to_i32().ok_or(
+                        H2Error.ProtocolFailed
+                    ).try().to_i64()
+                ).try(H2Error.ProtocolFailed);
+                self.wire.number(8, sid, n).try();
+            });
+        });
+        (kind == 7).then(
+            () { (sid == 0 && n >= 8).ensure(H2Error.ProtocolFailed).try(); }
+        );
+        self.flush().try();
+        Ok(kind != 7)
+    }
+}
+connection = (
+    a         : Alloc,
+    transport : Ptr<()>,
+    reactor   : Ptr<()>,
+    listener  : Ptr<()>,
+    secure    : bool
+) Res<(), H2Error> {
+    buffer = a.realloc<u8>(null_ptr<u8>(), 16384).try(H2Error.RecvFailed);
+    wire   = Wire(
+        transport: transport,
+        reactor: reactor,
+        listener: listener,
+        header: a.realloc<u8>(null_ptr<u8>(), 24).try(H2Error.RecvFailed),
+        output: a.realloc<u8>(null_ptr<u8>(), 16393).try(H2Error.SendFailed)
+    );
+    wire.transfer(buffer, 24, 0).try();
+    (!secure || transport_h2_selected(transport)).ensure(H2Error.ProtocolFailed).try();
+    (str_at(buffer, 24) == "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n").ensure(H2Error.ProtocolFailed).try();
+    // Advertise concurrent stream and header-list limits.
+    put(buffer, 2, 3); put(buffer.offset(2), 4, 32);
+    put(buffer.offset(6), 2, 6); put(buffer.offset(8), 4, 8192);
+    wire.frame(4, 0, 0, buffer, 12).try();
+    session ::= Session(
+        alloc: a,
+        state: h2_server_state(),
+        decoder: h2_request_decoder(a).try(),
+        ids: [usize, 32](),
+        lengths: [usize, 32](),
+        sent: [usize, 32](),
+        expected: [usize, 32](),
+        has_expected: [bool, 32](),
+        ready: [bool, 32](),
+        ok: [bool, 32](),
+        headers_sent: [bool, 32](),
+        bodies: a.realloc<u8>(
+            null_ptr<u8>(),
+            32 * 65536
+        ).try(H2Error.RecvFailed),
+        block: a.realloc<u8>(null_ptr<u8>(), 8192).try(H2Error.RecvFailed),
+        block_len: 0,
+        header_sid: 0,
+        header_end: false,
+        requests: 0,
+        wire: wire
+    );
+    first   ::= true;
+    loop((h) {
+        wire.transfer(wire.header, 9, 0).try();
+        n = be(wire.header, 3); kind = wire.header.read(3); flags = wire.header.read(4);
+        sid = be(wire.header.offset(5), 4) % 2147483648;
+        (n > 16384).then(
+            () { wire.goaway(session.state.last_stream(), 6).try(); h.break(); }
+        );
+        (first && (kind != 4 || flag(flags, 1))).then(() { wire.goaway(0, 1).try(); h.break(); });
+        first = false;
+        wire.transfer(buffer, n, 0).try();
+        session.dispatch(kind, flags, sid, buffer, n).match({
+            Ok(keep) => { (!keep).then(() { h.break(); }); },
+            Err(_)   => { wire.goaway(
+                session.state.last_stream(),
+                1
+            ).try(); h.break(); },
+        });
+        (session.requests == 128).then(() {
+            active ::= false;
+            Range(0, 32).loop((i) { (session.ids[i] != 0).then(() { active = true; }); });
+            (!active).then(
+                () { wire.goaway(session.state.drain(), 0).try(); h.break(); }
+            );
+        });
+    });
+    Ok(())
+}
+serve_h2* = (env: Env) Res<(), H2Error | AllocError> {
+    arena   = env.mem.alloc();
+    host    = "127.0.0.1".c_text(arena).try();
+    secure  = env.argv.find(
+        (arg) { arg == "--tls" }
+    ).match({Ok(_) => true, None => false});
+    context = secure.match({
+        true  => ServerContext.create(
+            arena,
+            "build/cert.pem",
+            "build/key.pem"
+        ).try(H2Error.TlsFailed),
+        false => ServerContext(handle: null_ptr<()>()),
+    });
+    secure.then(() { context.enable_h2(); });
+    listener = Native.zen_http_listen(host.ptr(), 18082, context.handle);
+    (!listener.is_null()).ensure(H2Error.ConnectFailed).try();
+    @scope.defer(() { Native.zen_http_listener_close(listener); });
+    reactor = Native.zen_http_reactor_new(listener);
+    (!reactor.is_null()).ensure(H2Error.ConnectFailed).try();
+    @scope.defer(() { Native.zen_http_reactor_free(reactor); });
+    loop((h) {
+        transport = Native.zen_http_accept(listener);
+        transport.is_null().match({
+            true  => { (Native.zen_http_wait_timeout(reactor, 1000) >= 0).ensure(H2Error.Closed).try(); },
+            false => {
+                @scope.defer(() { Native.zen_http_close(transport); });
+                connection_arena = env.mem.alloc();
+                connection(
+                    connection_arena,
+                    transport,
+                    reactor,
+                    listener,
+                    secure
+                ).match({Ok(_) => (), Err(_) => ()});
+            },
+        });
+    });
+    Ok(())
+}
