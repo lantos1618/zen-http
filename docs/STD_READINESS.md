@@ -2,11 +2,11 @@
 
 HTTP/1 now imports `std.net.readiness`. Generic kqueue/epoll creation,
 registration, waiting and slot extraction are maintained in the compiler's
-standard library instead of this package. Build with the std-readiness compiler
-branch containing `b283fc2d` (or a later revision including it), setting
+standard library instead of this package. Compiler PR #7 is merged into main
+at `b107afe5`; build that revision or a later descendant, setting
 `ZEN_COMPILER` and `ZEN_STD` to that checkout. The build adds its `src/std/net`
 header directory when compiling emitted C and records both readiness source
-files in the environment manifest. Mainline std integration is pending.
+files in the environment manifest. HTTP PR #1 is merged as `3e379b9`.
 
 Zen HTTP/1 owns the `Readiness` value with a 257-event caller-allocated buffer.
 The listener still has slot 256; connection slots are 0..255. The existing
