@@ -1,0 +1,79 @@
+Socket, SocketFault, SocketFd = std.net.socket
+tls13_psk_connect, tls13_psk_round_trip, Tls13ClientError = tls13_client
+Shutdown = c.bind("sys/socket.h", { shutdown = (fd: i32, how: i32) i32 })
+AlignmentAlloc = { base: Alloc, byte_requests: Ptr<usize>, word_requests: Ptr<usize>, odd: Ptr<Ptr<u8>>, frees: Ptr<usize> }
+AlignmentAlloc.impl(Alloc, {
+    raw = (self: @Self, count: usize, align: usize) Res<Ptr<u8>, AllocError> {
+        (align >= 8).match({
+            true  => { self.word_requests.write(0, self.word_requests.read(0) + 1); self.base.raw(count, align) },
+            false => {
+                self.byte_requests.write(0, self.byte_requests.read(0) + 1);
+                allocated = self.base.raw(count + 1, 8).try(); self.odd.write(0, allocated.offset(1)); Ok(allocated.offset(1))
+            },
+        })
+    }
+    realloc = <T>(self: @Self, pointer: Ptr<T>, count: usize) Res<Ptr<T>, AllocError> {
+        pointer.is_null().ensure(AllocError.OutOfMemory).try();
+        self.byte_requests.write(0, self.byte_requests.read(0) + 1);
+        allocated = self.base.raw(pointer.bytes(count) + 1, 8).try();
+        self.odd.write(0, allocated.offset(1)); Ok(allocated.offset(1).to<T>())
+    }
+    free = <T>(self: @Self, pointer: Ptr<T>) {
+        self.frees.write(0, self.frees.read(0) + 1);
+        pointer.to<u8>().same(self.odd.read(0)).match({true => self.base.free(pointer.to<u8>().back(1)), false => self.base.free(pointer)});
+    }
+})
+
+post_over_native_session = http.native_client
+exercise = (a: Alloc, http_alloc: Alloc, socket: SocketFd, psk: Ptr<u8>, random: Ptr<u8>, data: Ptr<u8>, output: Ptr<u8>) Res<bool, Tls13ClientError
+    | AllocError> {
+    session ::= tls13_psk_connect(a, socket, "ZenTest", psk, 32, random).try();
+    url      = (MODE == 7).match({true => "http://example.test/native", false => "https://example.test/native"});
+    response = session.post_over_native_session(
+        http_alloc,
+        url,
+        http_alloc.Vec<str>(),
+        "native post"
+    );
+    good     = response.match({
+        Ok(value) => MODE < 3 && value.status == 200 && value.body.view().eq(
+            "hello"
+        ),
+        Err(_)    => MODE >= 3,
+    });
+    // A post-call write must use the original session's next sequence number.
+    (MODE < 3).then(() { session.close_notify().try(); });
+    session.abort(); session.abort();
+    Ok(good)
+}
+main = (env: Env) Res<i32, AllocError | SocketFault> {
+    a      = env.mem.alloc();
+    memory = a.raw(51000, 8).try(); @scope.defer(() { a.free(memory); });
+    psk = memory; random = memory.offset(32); data = memory.offset(64); output = memory.offset(50100);
+    Range(0, 32).loop((i) { psk.write(i, i.to_u8().match({Ok(v) => v, None => 0})); });
+    Range(0, 50000).loop((i) { data.write(i, (i % 251 + 1).to_u8().match({Ok(v) => v, None => 0})); });
+    // RANDOM
+    counters = a.raw(40, 8).try(); @scope.defer(() { a.free(counters); });
+    byte_requests = counters.to<usize>(); word_requests = byte_requests.offset(1); frees = byte_requests.offset(2); odd = counters.offset(24).to<Ptr<u8>>();
+    byte_requests.write(0, 0); word_requests.write(0, 0); frees.write(0, 0); odd.write(0, null_ptr<u8>());
+    aligned = AlignmentAlloc(
+        base: a,
+        byte_requests: byte_requests,
+        word_requests: word_requests,
+        odd: odd,
+        frees: frees
+    );
+    socket ::= Socket.tcp_connect(a, "127.0.0.1", TEST_PORT).try();
+    good       = exercise(
+        aligned,
+        a,
+        socket.handle(),
+        psk,
+        random,
+        data,
+        output
+    ).match({Ok(v) => v, Err(_) => false});
+    aligned_ok = byte_requests.read(0) == 0 && word_requests.read(0) == 2 && frees.read(0) == 2;
+    println("session behavior: {} alignment and release: {}", good, aligned_ok);
+    socket.close(); Ok((good && aligned_ok).match({true => 0, false => 1}))
+}

@@ -1,0 +1,111 @@
+Range = std.core
+decode_response_into, parse_response = http.response_decode
+HttpError = http.response_types
+Failure = WrongBody | WrongStatus | AcceptedBad | WrongRequest
+Fragments = {
+    raw: str,
+    at :: usize,
+    step: usize,
+    fail: bool,
+}
+receive = (self :: Fragments, out: Ptr<u8>, n: usize) Res<usize, HttpError> {
+        ((self.at < self.raw.len) || !self.fail).ensure(
+            HttpError.RecvFailed
+        ).try();
+        left  = self.raw.len - self.at;
+        take  = (left < n).match({true => left, false => n});
+        count = (take < self.step).match({true => take, false => self.step});
+        Range(0, count).loop((i) { out.write(i, self.raw[self.at + i]); });
+        self.at = self.at + count;
+        Ok(count)
+}
+check = (a: Alloc, raw: str, step: usize, fail: bool, expected: Res<str>) Res<(), AllocError
+    | HttpError
+    | Failure> {
+    reader ::= Fragments(raw: raw, at: 0, step: step, fail: fail);
+    out    ::= a.String().try();
+    result = decode_response_into(
+        (buffer: Ptr<u8>, n: usize) Res<usize, HttpError> { reader.receive(
+            buffer,
+            n
+        ) },
+        a,
+        out
+    );
+    expected.match({
+        Ok(body) => {
+            meta = result.try();
+            (meta.status == 200).ensure(Failure.WrongStatus).try();
+            out.view().eq(body).ensure(Failure.WrongBody)
+        },
+        None     => result.match({Err(_) => Ok(()), Ok(_) => Err(Failure.AcceptedBad)}),
+    })
+}
+main = (env: Env) Res<(), AllocError | HttpError | Failure> {
+    a = env.mem.alloc();
+    Range(1, 70).loop((step) {
+        check(
+            a,
+            "HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello",
+            step,
+            false,
+            Ok("hello")
+        ).try();
+        check(
+            a,
+            "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n2\r\nhe\r\n3;foo=bar\r\nllo\r\n0\r\nX-Foo: yes\r\n\r\n",
+            step,
+            false,
+            Ok("hello")
+        ).try();
+        check(
+            a,
+            "HTTP/1.1 200 OK\r\n\r\nhello",
+            step,
+            false,
+            Ok("hello")
+        ).try();
+    });
+    check(
+        a,
+        "HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhell",
+        1,
+        false,
+        None
+    ).try();
+    check(
+        a,
+        "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n2\r\nhe\r\n",
+        1,
+        false,
+        None
+    ).try();
+    check(a, "HTTP/1.1 200 OK\r\n\r\nhello", 1, true, None).try();
+    check(
+        a,
+        "HTTP/1.1 200 OK\r\nContent-Length: 1\r\nContent-Length: 2\r\n\r\nx",
+        1,
+        false,
+        None
+    ).try();
+    check(
+        a,
+        "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nContent-Length: 1\r\n\r\nx",
+        1,
+        false,
+        None
+    ).try();
+    check(
+        a,
+        "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\nx\r\n",
+        1,
+        false,
+        None
+    ).try();
+    check(a, "HTTP/1.1 200 OK\r\nBad Name: x\r\n\r\n", 1, false, None).try();
+    check(a, "HTTP/1.1 200 OK\r\n", 1, false, None).try();
+    println(
+        "native HTTP decoder: 207 split cases and 8 rejection cases passed"
+    );
+    Ok(())
+}

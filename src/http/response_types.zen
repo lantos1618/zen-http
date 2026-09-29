@@ -1,0 +1,24 @@
+// Transport-independent HTTP/1 response types.
+
+String = std.text
+WriteError = std.core.io
+
+HttpError* = ConnectFailed
+    | TlsFailed
+    | SendFailed
+    | RecvFailed
+    | DecodeFailed
+    | BodyWriteFailed(WriteError)
+    | Status(i32)
+
+HttpResponseMeta* = {
+    status*:             i32,
+    content_length*:     usize,
+    has_content_length*: bool,
+    chunked*:            bool,
+}
+
+HttpResponse* = {
+    status*: i32,
+    body*:   String,
+}

@@ -5,7 +5,8 @@ str, String = std.text
 Res = std.core
 Sink = std.core.io
 Vec = std.collections
-ParsedUrl, parse_url = std.net.url
+parse_url = std.net.url
+build_request = http.client_request
 Transport, dial, write, close = tls
 
 HttpError*, HttpResponseMeta*, HttpResponse*, http_error = http.client_types
@@ -33,31 +34,4 @@ HttpClient* = {
         meta = self.post_into(a, url, headers, body, response_body).try();
         Ok(HttpResponse(status: meta.status, body: response_body));
     }
-}
-
-build_request = (
-    parsed  : ParsedUrl,
-    a       : Alloc,
-    headers : Vec<str>,
-    body    : str
-) Res<String, HttpError> {
-    sb ::= a.String().try(HttpError.SendFailed);
-
-    sb.add("POST ").try(HttpError.SendFailed);
-    sb.add(parsed.path).try(HttpError.SendFailed);
-    sb.add(" HTTP/1.1\r\nHost: ").try(HttpError.SendFailed);
-    sb.add(parsed.host).try(HttpError.SendFailed);
-    sb.add("\r\n").try(HttpError.SendFailed);
-
-    headers.loop((h, header) {
-        sb.add(header).try(HttpError.SendFailed);
-        sb.add("\r\n").try(HttpError.SendFailed);
-    });
-
-    sb.add("Content-Length: ").try(HttpError.SendFailed);
-    sb.fmt("{}", body.len).try(HttpError.SendFailed);
-    sb.add("\r\n\r\n").try(HttpError.SendFailed);
-    sb.add(body).try(HttpError.SendFailed);
-
-    Ok(sb);
 }

@@ -1,0 +1,55 @@
+// Experimental HTTP/1 POST over an already authenticated native PSK session.
+// The caller owns the session, socket, peer identity, entropy and deadlines.
+Alloc, Ptr = std.mem
+Sink = std.core.io
+Vec = std.collections
+str, String = std.text
+parse_url = std.net.url
+Tls13Session, Tls13ClientError = tls13_session
+HttpError*, HttpResponse*, HttpResponseMeta* = http.response_types
+decode_response_into = http.response_decode
+build_request = http.client_request
+
+// One request per borrowed session. This decoder may read past the response
+// boundary, so the caller must close/abort the session afterwards, including
+// on errors. Streaming sinks may already contain an authenticated body prefix.
+post_over_native_session_into* = (
+    session :: Tls13Session,
+    a       : Alloc,
+    url     : str,
+    headers : Vec<str>,
+    body    : str,
+    out     :: Sink
+)
+    Res<HttpResponseMeta, HttpError> {
+    parsed = url.parse_url().try(HttpError.DecodeFailed);
+    parsed.scheme.eq_ignore_case("https").ensure(HttpError.DecodeFailed).try();
+    request = parsed.build_request(a, headers, body).try();
+    session.write(
+        request.view().ptr(),
+        request.view().len
+    ).try(HttpError.SendFailed);
+    decode_response_into(
+        (buffer: Ptr<u8>, count: usize) Res<usize, HttpError> {
+            session.read(buffer, count).try(HttpError.RecvFailed)
+        }, a, out
+    )
+}
+
+post_over_native_session* = (
+    session :: Tls13Session,
+    a       : Alloc,
+    url     : str,
+    headers : Vec<str>,
+    body    : str
+) Res<HttpResponse, HttpError> {
+    response ::= a.String().try(HttpError.RecvFailed);
+    meta = session.post_over_native_session_into(
+        a,
+        url,
+        headers,
+        body,
+        response
+    ).try();
+    Ok(HttpResponse(status: meta.status, body: response))
+}
