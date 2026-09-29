@@ -1,0 +1,65 @@
+Linux dev-box 6.8.0-139-generic #139-Ubuntu SMP PREEMPT_DYNAMIC Sat Aug  1 03:52:05 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
+Ubuntu clang version 18.1.3 (1ubuntu1)
+Target: x86_64-pc-linux-gnu
+Thread model: posix
+InstalledDir: /usr/bin
+go version go1.27.0 linux/amd64
+OpenSSL 3.5.4 30 Sep 2025 (Library: OpenSSL 3.5.4 30 Sep 2025)
+4e7578d175fcb6d2f5b3ae7ad7b13ce14f4309d8
+86097c490263ab662d62e8e7b541390bdec7d149
+962f1d95654887ece7f7ae8c19de622b49b9f921544518822fd0e18d78e4d928  ../zen-actor-runtime/zen
+43b6b285007010f6b2e1c4ba79bf55681d6d6851c21e32c6fb02a47206c9ac7c  src/http/chunked.zen
+c8cf5708a9efcad570622239a1ea10d574782b9f04106c05fffdddc7d5a371f0  src/http/client.zen
+eabd62f190d8611692ed70ea3ddc43bbaf93c7763c2dcc9a45a2065363cacc8b  src/http/client_decode.zen
+63fd8d73eb279149ac8f8e3e819068881137837a628c029dce3b8c5c824c58b2  src/http/client_types.zen
+585af7f44ecb48f879538ece39f838a18f74ae86d8a7d7f289005f3107ddaab8  src/http/http.zen
+f108d498ffa581d58addbf858b7e0f994742e16406f453d798593ab5522dba55  src/http/http2.zen
+3eeb5fa737907b501b3ff607b6a7eaff3a9f6ea08ac5034f9ead88d79f7f127b  src/http/http2_client.zen
+2707f4dc0135d2b7c9ce401b7289158e08fb3f917476ddf818b483190555bf4e  src/http/http2_frame.zen
+9b764a97ef5cece0d7d3430a8e773eec426a0f679c0027700512807a1b406282  src/http/http2_hpack.zen
+55d0b26491485f2b07d7ac514127a22f7d4be2e7d2aeb53e3ed437ddc2350f44  src/http/http2_request.zen
+ceca09f8751ecabc6a34bd632f5b6f367962e88033ebdd855155586a27aa06cc  src/http/http2_server.zen
+919d7e1108349952644cc0a57361cfa084f01f3f922807397a94ae5b29dffab0  src/http/http2_server_state.zen
+3a64a9edbb143d54493d315b2cb19b9f5c443a2989fff95eb474d62aec7b9ee8  src/http/http2_types.zen
+bc6918af3859d0bc0e8eed69420bcef2dab37419aa53984473359a1fd693cd55  src/http/server.zen
+60978e4c02058762759a9525262a3bdd3927674003459ecaa24a0d88f383cd95  src/http/transport.zen
+55a9caf8d0b384a0e64395b87d258cab918d510f2a8d901dd0ed50fb800e0839  src/transport.h
+8232f479e5cbde1b9c567c63dadf64f28f3106441d04a96c3cc41ec1eda3cfcf  src/reactor.h
+36ae9108feebfef225947ca689bf74f1c4ddc5ab5df7db9a15a552ab676fa421  ../zen-actor-runtime/src/std/net/readiness.zen
+a678e813eca6ee3ab973ee320116812aeb5e36ef9a588d6cc515924a46fdd80d  ../zen-actor-runtime/src/std/net/zen_readiness.h
+89d7cfdd531ad397b5327b10f7040d3ba2c271eb64a5626900e01df87ee12ce4  ../zen-openssl/src/tls.zen
+ecc31d764ea1bb72106e09eea4ab0a6281c99f3ae967490772309a0a1acd9d37  ../zen-openssl/src/zen_tls.h
+e79acf43e414a76023d00e11303afdbcbf0faae2644403068afeb7803e3dbf18  bench/uws.cpp
+3d2cfdb1e3f5210e48ab6b30eac393c0844ecf275a3bef26adf3f67dde9702a0  bench/load.go
+893e4c898d12237f0aca01f92978eed97b6d6ec05ea7ecd5cafcf4cd13bbcb71  build/zen.c
+992e36e116c11ebd417ec46174f307b60e9f10bdbf7382d8c8b19613e92dda2f  build/client.c
+473e95b6bb8738281e9035e3b2936846554a8a935b9e1869dd22ada5b57e0826  build/h2-server.c
+297921f3c32db755e1068198222fc367ef8d88795cfe341d2ec6a783e5ef0aaf  build/zen-h2-server
+88a368cd34cec00fba753db89b0eeaf75a5d5fba254df5c58e9fd19f5f446006  build/zen-server
+831a1aa1342dfed9da308c00c22b751289ee902b265b0655b6329e745af3badc  build/uws-server
+03cc0296c16a014f5429aec24533f3308a76e10a048622726fcfa454302d23d1  build/load
+4bece1798aace83d622e0c19f6533d091064e32c8df3a58c854f090d5900fac6  /home/ubuntu/zen-readiness-http-validation-20260928/zen-http/build/openssl/lib/libssl.a
+934ac03b3ca289444d1fa662c7f96becbfd682dbccaa45a29fd136bcb9288ea7  /home/ubuntu/zen-readiness-http-validation-20260928/zen-http/build/openssl/lib/libcrypto.a
+eb1bfc5813a6cda888ebabd42a9812b4fe2c2b54794bf0bb173b857957368c31  build/cert.pem
+
+Source revisions (clean working trees checked after benchmark):
+zen compiler/std 08ea4cbda5cd62eabc56ac52d00753fcf6ee1f80
+zen-http a2ad60523ffa4114fca862202f5190226617411f
+zen-openssl 89f580b326ca6f4d707724618daee27aec2425d1
+
+Commands, isolated /home/ubuntu/zen-readiness-http-validation-20260928:
+compiler: make build/bootstrap/zen-seed CC=clang CFLAGS='-O2 -std=c99'
+compiler: cp build/bootstrap/zen-seed zen
+ZEN_COMPILER=../zen-actor-runtime/zen ZEN_STD=../zen-actor-runtime/src GO_BIN=/home/ubuntu/.local/go/bin/go
+sh scripts/build.sh
+sh scripts/check.sh
+python3 bench/run.py --trials 3 --seconds 3 --sizes 64 16384 --connections 1 32 --server-cpu 2 --client-cpus 4 5 6 7 --output build/linux-refresh-20260929.json
+python3 bench/report.py build/linux-refresh-20260929.json --output build/linux-refresh-20260929.md
+
+All commands exited zero. Full check includes HTTP/1 echo, fragmentation,
+pipelining, close, chunked framing, rejection, HTTP/2 independent peer,
+flow-control isolation, malformed frames/headers, resource GOAWAY, TLS ALPN,
+untrusted certificates, UBSan and abrupt-disconnect survival.
+Compiler warnings remain. This run does not claim full compiler validation.
+Runtime TLS in this benchmark is zen-openssl, not native zen-crypto TLS.
+Logs retained on the validation host under zen-http/build/refresh-{build,check,bench}.log.

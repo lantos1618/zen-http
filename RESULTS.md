@@ -1,6 +1,46 @@
-# Zen HTTP versus native uWebSockets — 2026-09-28
+# Zen HTTP versus native uWebSockets — 2026-09-29
 
-## Latest Linux run — current implementation
+## Latest Linux run — 2026-09-29
+
+[Full matrix](bench/results/2026-09-29/linux.md),
+[all 48 raw trials](bench/results/2026-09-29/linux.json), and
+[build and validation evidence](bench/results/2026-09-29/environment-linux.txt).
+Every planned trial completed with response validation. Measured source:
+zen-http `a2ad605`, zen-openssl `89f580b`, Zen compiler/std `08ea4cbd`.
+
+**Zen still does not beat uWebSockets overall.** At 32 connections with 16-KiB
+bodies, plaintext's paired median throughput ratio is **1.113x**
+(observed range **1.072–1.121x**), with median-trial p99 **892.4 µs versus
+981.9 µs**. The corresponding TLS ratio is **0.777x** (**0.769–0.827x**):
+**22.3% lower throughput**, with p99 **2482.7 µs versus 1929.2 µs**.
+All four TLS paired medians are below 1.0. This identifies a profiling target;
+it does not establish a universal ranking or a statistically proven change
+from the previous run.
+
+This is HTTP/1 echo over IPv4 loopback on the same 16-vCPU virtual Linux host,
+with Clang 18.1.3, Go **1.27.0**, and the same pinned uWebSockets/uSockets and
+OpenSSL 3.5.4 revisions recorded in the evidence. Both servers use OpenSSL for
+TLS. These results do **not** measure the new native zen-crypto TLS client.
+The changed Go toolchain and uncontrolled host variation mean the old/new runs
+cannot isolate a server performance change.
+
+Each server is pinned to CPU 2 and the load generator to CPUs 4–7. Three paired
+trials per cell alternate server order, with one second of warmup and three
+seconds of measurement. Connections persist with one outstanding request per
+connection; handshakes precede measurement. Physical-core isolation and
+exclusive host use are not asserted. Ranges are observed extrema, not confidence
+intervals. p99 values are medians of trial percentiles, not pooled percentiles.
+Server CPU/RSS include startup and warmup. Client overhead is part of this
+same-host closed-loop experiment.
+
+The refreshed full Linux HTTP package suite passed HTTP/1 framing and chunking,
+independent HTTP/2 peers and malformed-input checks, TLS/ALPN checks, UBSan,
+and abrupt-disconnect regressions. HTTP/2 has **no performance result** here.
+No remote-client, offered-load latency, handshake throughput, native-TLS server,
+or production-equivalence claim is made. Reproduction commands below apply;
+use a fresh output path.
+
+## Previous Linux run — 2026-09-28 (historical)
 
 [Full matrix and server resource measurements](bench/results/2026-09-28/linux.md),
 [all 48 raw trials](bench/results/2026-09-28/linux.json), and

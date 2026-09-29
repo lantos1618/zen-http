@@ -1,0 +1,1384 @@
+{
+  "schema_version": 2,
+  "status": "complete",
+  "created_utc": "2026-09-29T00:59:25.599812+00:00",
+  "environment": {
+    "platform": "Linux-6.8.0-139-generic-x86_64-with-glibc2.39",
+    "machine": "x86_64",
+    "python": "3.12.3"
+  },
+  "config": {
+    "trials": 3,
+    "seconds": 3.0,
+    "sizes": [
+      64,
+      16384
+    ],
+    "connections": [
+      1,
+      32
+    ],
+    "tls": [
+      false,
+      true
+    ],
+    "server_cpu": 2,
+    "client_cpus": [
+      4,
+      5,
+      6,
+      7
+    ]
+  },
+  "binaries_sha256": {
+    "zen-server": "88a368cd34cec00fba753db89b0eeaf75a5d5fba254df5c58e9fd19f5f446006",
+    "uws-server": "831a1aa1342dfed9da308c00c22b751289ee902b265b0655b6329e745af3badc",
+    "load": "03cc0296c16a014f5429aec24533f3308a76e10a048622726fcfa454302d23d1"
+  },
+  "rows": [
+    {
+      "server": "zen",
+      "tls": false,
+      "connections": 1,
+      "body": 64,
+      "trial": 0,
+      "seconds": 3.0,
+      "order": 0,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":64,\"client_cpu_s_including_warmup\":2.958387,\"connections\":1,\"elapsed_s\":3.000038428,\"p50_us\":34.44,\"p95_us\":43.149,\"p99_us\":50.42,\"requests\":82199,\"rps\":27399.315699698764,\"tls\":false}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 2.07,
+        "peak_rss_kib_including_startup_warmup": 5096,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 82199,
+      "elapsed_s": 3.000038428,
+      "rps": 27399.315699698764,
+      "p50_us": 34.44,
+      "p95_us": 43.149,
+      "p99_us": 50.42,
+      "client_cpu_s_including_warmup": 2.958387,
+      "server_log": ""
+    },
+    {
+      "server": "uws",
+      "tls": false,
+      "connections": 1,
+      "body": 64,
+      "trial": 0,
+      "seconds": 3.0,
+      "order": 1,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":64,\"client_cpu_s_including_warmup\":3.0051170000000003,\"connections\":1,\"elapsed_s\":3.000044979,\"p50_us\":34.24,\"p95_us\":41.839,\"p99_us\":49.88,\"requests\":83377,\"rps\":27791.91664912701,\"tls\":false}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 1.92,
+        "peak_rss_kib_including_startup_warmup": 5388,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 83377,
+      "elapsed_s": 3.000044979,
+      "rps": 27791.91664912701,
+      "p50_us": 34.24,
+      "p95_us": 41.839,
+      "p99_us": 49.88,
+      "client_cpu_s_including_warmup": 3.0051170000000003,
+      "server_log": "uWS echo ready on 127.0.0.1:18080\n"
+    },
+    {
+      "server": "uws",
+      "tls": false,
+      "connections": 1,
+      "body": 64,
+      "trial": 1,
+      "seconds": 3.0,
+      "order": 0,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":64,\"client_cpu_s_including_warmup\":2.990458,\"connections\":1,\"elapsed_s\":3.000059129,\"p50_us\":34.5,\"p95_us\":42.319,\"p99_us\":49.87,\"requests\":82893,\"rps\":27630.455412933963,\"tls\":false}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 1.92,
+        "peak_rss_kib_including_startup_warmup": 5400,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 82893,
+      "elapsed_s": 3.000059129,
+      "rps": 27630.455412933963,
+      "p50_us": 34.5,
+      "p95_us": 42.319,
+      "p99_us": 49.87,
+      "client_cpu_s_including_warmup": 2.990458,
+      "server_log": "uWS echo ready on 127.0.0.1:18080\n"
+    },
+    {
+      "server": "zen",
+      "tls": false,
+      "connections": 1,
+      "body": 64,
+      "trial": 1,
+      "seconds": 3.0,
+      "order": 1,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":64,\"client_cpu_s_including_warmup\":2.977698,\"connections\":1,\"elapsed_s\":3.000040109,\"p50_us\":34.24,\"p95_us\":42.78,\"p99_us\":49.609,\"requests\":83339,\"rps\":27779.295266748715,\"tls\":false}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 2.07,
+        "peak_rss_kib_including_startup_warmup": 5104,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 83339,
+      "elapsed_s": 3.000040109,
+      "rps": 27779.295266748715,
+      "p50_us": 34.24,
+      "p95_us": 42.78,
+      "p99_us": 49.609,
+      "client_cpu_s_including_warmup": 2.977698,
+      "server_log": ""
+    },
+    {
+      "server": "zen",
+      "tls": false,
+      "connections": 1,
+      "body": 64,
+      "trial": 2,
+      "seconds": 3.0,
+      "order": 0,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":64,\"client_cpu_s_including_warmup\":3.012487,\"connections\":1,\"elapsed_s\":3.000069049,\"p50_us\":34.259,\"p95_us\":43.81,\"p99_us\":52.13,\"requests\":84301,\"rps\":28099.68658158041,\"tls\":false}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 2.03,
+        "peak_rss_kib_including_startup_warmup": 5124,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 84301,
+      "elapsed_s": 3.000069049,
+      "rps": 28099.68658158041,
+      "p50_us": 34.259,
+      "p95_us": 43.81,
+      "p99_us": 52.13,
+      "client_cpu_s_including_warmup": 3.012487,
+      "server_log": ""
+    },
+    {
+      "server": "uws",
+      "tls": false,
+      "connections": 1,
+      "body": 64,
+      "trial": 2,
+      "seconds": 3.0,
+      "order": 1,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":64,\"client_cpu_s_including_warmup\":3.022096,\"connections\":1,\"elapsed_s\":3.000068529,\"p50_us\":34.74,\"p95_us\":42.79,\"p99_us\":50.579,\"requests\":82106,\"rps\":27368.041498494717,\"tls\":false}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 1.89,
+        "peak_rss_kib_including_startup_warmup": 5396,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 82106,
+      "elapsed_s": 3.000068529,
+      "rps": 27368.041498494717,
+      "p50_us": 34.74,
+      "p95_us": 42.79,
+      "p99_us": 50.579,
+      "client_cpu_s_including_warmup": 3.022096,
+      "server_log": "uWS echo ready on 127.0.0.1:18080\n"
+    },
+    {
+      "server": "zen",
+      "tls": false,
+      "connections": 1,
+      "body": 16384,
+      "trial": 0,
+      "seconds": 3.0,
+      "order": 0,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":16384,\"client_cpu_s_including_warmup\":2.850327,\"connections\":1,\"elapsed_s\":3.000108089,\"p50_us\":57.66,\"p95_us\":74.87,\"p99_us\":83.899,\"requests\":51017,\"rps\":17005.05398024011,\"tls\":false}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 1.97,
+        "peak_rss_kib_including_startup_warmup": 5124,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 51017,
+      "elapsed_s": 3.000108089,
+      "rps": 17005.05398024011,
+      "p50_us": 57.66,
+      "p95_us": 74.87,
+      "p99_us": 83.899,
+      "client_cpu_s_including_warmup": 2.850327,
+      "server_log": ""
+    },
+    {
+      "server": "uws",
+      "tls": false,
+      "connections": 1,
+      "body": 16384,
+      "trial": 0,
+      "seconds": 3.0,
+      "order": 1,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":16384,\"client_cpu_s_including_warmup\":2.803385,\"connections\":1,\"elapsed_s\":3.00005402,\"p50_us\":59.2,\"p95_us\":77.969,\"p99_us\":87.159,\"requests\":50365,\"rps\":16788.031036854463,\"tls\":false}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 1.91,
+        "peak_rss_kib_including_startup_warmup": 5456,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 50365,
+      "elapsed_s": 3.00005402,
+      "rps": 16788.031036854463,
+      "p50_us": 59.2,
+      "p95_us": 77.969,
+      "p99_us": 87.159,
+      "client_cpu_s_including_warmup": 2.803385,
+      "server_log": "uWS echo ready on 127.0.0.1:18080\n"
+    },
+    {
+      "server": "uws",
+      "tls": false,
+      "connections": 1,
+      "body": 16384,
+      "trial": 1,
+      "seconds": 3.0,
+      "order": 0,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":16384,\"client_cpu_s_including_warmup\":2.789269,\"connections\":1,\"elapsed_s\":3.000100078,\"p50_us\":58.04,\"p95_us\":75.499,\"p99_us\":85.339,\"requests\":50712,\"rps\":16903.43611264024,\"tls\":false}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 1.93,
+        "peak_rss_kib_including_startup_warmup": 5468,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 50712,
+      "elapsed_s": 3.000100078,
+      "rps": 16903.43611264024,
+      "p50_us": 58.04,
+      "p95_us": 75.499,
+      "p99_us": 85.339,
+      "client_cpu_s_including_warmup": 2.789269,
+      "server_log": "uWS echo ready on 127.0.0.1:18080\n"
+    },
+    {
+      "server": "zen",
+      "tls": false,
+      "connections": 1,
+      "body": 16384,
+      "trial": 1,
+      "seconds": 3.0,
+      "order": 1,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":16384,\"client_cpu_s_including_warmup\":2.862248,\"connections\":1,\"elapsed_s\":3.000069409,\"p50_us\":55.059,\"p95_us\":73.04,\"p99_us\":81.789,\"requests\":55709,\"rps\":18569.237042608704,\"tls\":false}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 2.01,
+        "peak_rss_kib_including_startup_warmup": 5152,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 55709,
+      "elapsed_s": 3.000069409,
+      "rps": 18569.237042608704,
+      "p50_us": 55.059,
+      "p95_us": 73.04,
+      "p99_us": 81.789,
+      "client_cpu_s_including_warmup": 2.862248,
+      "server_log": ""
+    },
+    {
+      "server": "zen",
+      "tls": false,
+      "connections": 1,
+      "body": 16384,
+      "trial": 2,
+      "seconds": 3.0,
+      "order": 0,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":16384,\"client_cpu_s_including_warmup\":2.918068,\"connections\":1,\"elapsed_s\":3.000073529,\"p50_us\":39.03,\"p95_us\":72.19,\"p99_us\":76.31,\"requests\":67100,\"rps\":22366.11848055808,\"tls\":false}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 2.04,
+        "peak_rss_kib_including_startup_warmup": 5136,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 67100,
+      "elapsed_s": 3.000073529,
+      "rps": 22366.11848055808,
+      "p50_us": 39.03,
+      "p95_us": 72.19,
+      "p99_us": 76.31,
+      "client_cpu_s_including_warmup": 2.918068,
+      "server_log": ""
+    },
+    {
+      "server": "uws",
+      "tls": false,
+      "connections": 1,
+      "body": 16384,
+      "trial": 2,
+      "seconds": 3.0,
+      "order": 1,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":16384,\"client_cpu_s_including_warmup\":2.790381,\"connections\":1,\"elapsed_s\":3.000045599,\"p50_us\":57.669,\"p95_us\":74.25,\"p99_us\":83.279,\"requests\":51268,\"rps\":17089.073585111197,\"tls\":false}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 1.93,
+        "peak_rss_kib_including_startup_warmup": 5340,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 51268,
+      "elapsed_s": 3.000045599,
+      "rps": 17089.073585111197,
+      "p50_us": 57.669,
+      "p95_us": 74.25,
+      "p99_us": 83.279,
+      "client_cpu_s_including_warmup": 2.790381,
+      "server_log": "uWS echo ready on 127.0.0.1:18080\n"
+    },
+    {
+      "server": "zen",
+      "tls": false,
+      "connections": 32,
+      "body": 64,
+      "trial": 0,
+      "seconds": 3.0,
+      "order": 0,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":64,\"client_cpu_s_including_warmup\":7.786882,\"connections\":32,\"elapsed_s\":3.000567086,\"p50_us\":305.898,\"p95_us\":569.905,\"p99_us\":626.626,\"requests\":297533,\"rps\":99158.922787704,\"tls\":false}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 4.0,
+        "peak_rss_kib_including_startup_warmup": 5096,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 297533,
+      "elapsed_s": 3.000567086,
+      "rps": 99158.922787704,
+      "p50_us": 305.898,
+      "p95_us": 569.905,
+      "p99_us": 626.626,
+      "client_cpu_s_including_warmup": 7.786882,
+      "server_log": ""
+    },
+    {
+      "server": "uws",
+      "tls": false,
+      "connections": 32,
+      "body": 64,
+      "trial": 0,
+      "seconds": 3.0,
+      "order": 1,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":64,\"client_cpu_s_including_warmup\":7.543432,\"connections\":32,\"elapsed_s\":3.000780364,\"p50_us\":310.818,\"p95_us\":583.506,\"p99_us\":636.735,\"requests\":293113,\"rps\":97678.92496113387,\"tls\":false}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 3.99,
+        "peak_rss_kib_including_startup_warmup": 5456,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 293113,
+      "elapsed_s": 3.000780364,
+      "rps": 97678.92496113387,
+      "p50_us": 310.818,
+      "p95_us": 583.506,
+      "p99_us": 636.735,
+      "client_cpu_s_including_warmup": 7.543432,
+      "server_log": "uWS echo ready on 127.0.0.1:18080\n"
+    },
+    {
+      "server": "uws",
+      "tls": false,
+      "connections": 32,
+      "body": 64,
+      "trial": 1,
+      "seconds": 3.0,
+      "order": 0,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":64,\"client_cpu_s_including_warmup\":7.632215,\"connections\":32,\"elapsed_s\":3.000536185,\"p50_us\":316.437,\"p95_us\":599.696,\"p99_us\":644.675,\"requests\":287166,\"rps\":95704.89482365633,\"tls\":false}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 4.0,
+        "peak_rss_kib_including_startup_warmup": 5400,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 287166,
+      "elapsed_s": 3.000536185,
+      "rps": 95704.89482365633,
+      "p50_us": 316.437,
+      "p95_us": 599.696,
+      "p99_us": 644.675,
+      "client_cpu_s_including_warmup": 7.632215,
+      "server_log": "uWS echo ready on 127.0.0.1:18080\n"
+    },
+    {
+      "server": "zen",
+      "tls": false,
+      "connections": 32,
+      "body": 64,
+      "trial": 1,
+      "seconds": 3.0,
+      "order": 1,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":64,\"client_cpu_s_including_warmup\":7.793286,\"connections\":32,\"elapsed_s\":3.000369897,\"p50_us\":302.908,\"p95_us\":556.646,\"p99_us\":626.285,\"requests\":301062,\"rps\":100341.62797761198,\"tls\":false}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 3.99,
+        "peak_rss_kib_including_startup_warmup": 5112,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 301062,
+      "elapsed_s": 3.000369897,
+      "rps": 100341.62797761198,
+      "p50_us": 302.908,
+      "p95_us": 556.646,
+      "p99_us": 626.285,
+      "client_cpu_s_including_warmup": 7.793286,
+      "server_log": ""
+    },
+    {
+      "server": "zen",
+      "tls": false,
+      "connections": 32,
+      "body": 64,
+      "trial": 2,
+      "seconds": 3.0,
+      "order": 0,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":64,\"client_cpu_s_including_warmup\":7.723529,\"connections\":32,\"elapsed_s\":3.000460237,\"p50_us\":312.007,\"p95_us\":585.755,\"p99_us\":637.115,\"requests\":291247,\"rps\":97067.44199056686,\"tls\":false}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 3.99,
+        "peak_rss_kib_including_startup_warmup": 5112,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 291247,
+      "elapsed_s": 3.000460237,
+      "rps": 97067.44199056686,
+      "p50_us": 312.007,
+      "p95_us": 585.755,
+      "p99_us": 637.115,
+      "client_cpu_s_including_warmup": 7.723529,
+      "server_log": ""
+    },
+    {
+      "server": "uws",
+      "tls": false,
+      "connections": 32,
+      "body": 64,
+      "trial": 2,
+      "seconds": 3.0,
+      "order": 1,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":64,\"client_cpu_s_including_warmup\":7.726773,\"connections\":32,\"elapsed_s\":3.000791884,\"p50_us\":316.588,\"p95_us\":600.555,\"p99_us\":644.945,\"requests\":287005,\"rps\":95643.08725649699,\"tls\":false}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 3.99,
+        "peak_rss_kib_including_startup_warmup": 5392,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 287005,
+      "elapsed_s": 3.000791884,
+      "rps": 95643.08725649699,
+      "p50_us": 316.588,
+      "p95_us": 600.555,
+      "p99_us": 644.945,
+      "client_cpu_s_including_warmup": 7.726773,
+      "server_log": "uWS echo ready on 127.0.0.1:18080\n"
+    },
+    {
+      "server": "zen",
+      "tls": false,
+      "connections": 32,
+      "body": 16384,
+      "trial": 0,
+      "seconds": 3.0,
+      "order": 0,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":16384,\"client_cpu_s_including_warmup\":7.700252,\"connections\":32,\"elapsed_s\":3.000921954,\"p50_us\":440.486,\"p95_us\":838.953,\"p99_us\":918.354,\"requests\":203750,\"rps\":67895.80106487502,\"tls\":false}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 3.99,
+        "peak_rss_kib_including_startup_warmup": 6088,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 203750,
+      "elapsed_s": 3.000921954,
+      "rps": 67895.80106487502,
+      "p50_us": 440.486,
+      "p95_us": 838.953,
+      "p99_us": 918.354,
+      "client_cpu_s_including_warmup": 7.700252,
+      "server_log": ""
+    },
+    {
+      "server": "uws",
+      "tls": false,
+      "connections": 32,
+      "body": 16384,
+      "trial": 0,
+      "seconds": 3.0,
+      "order": 1,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":16384,\"client_cpu_s_including_warmup\":7.116799,\"connections\":32,\"elapsed_s\":3.000720255,\"p50_us\":475.577,\"p95_us\":905.473,\"p99_us\":983.202,\"requests\":190024,\"rps\":63326.12967948923,\"tls\":false}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 3.99,
+        "peak_rss_kib_including_startup_warmup": 5372,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 190024,
+      "elapsed_s": 3.000720255,
+      "rps": 63326.12967948923,
+      "p50_us": 475.577,
+      "p95_us": 905.473,
+      "p99_us": 983.202,
+      "client_cpu_s_including_warmup": 7.116799,
+      "server_log": "uWS echo ready on 127.0.0.1:18080\n"
+    },
+    {
+      "server": "uws",
+      "tls": false,
+      "connections": 32,
+      "body": 16384,
+      "trial": 1,
+      "seconds": 3.0,
+      "order": 0,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":16384,\"client_cpu_s_including_warmup\":7.307383,\"connections\":32,\"elapsed_s\":3.002248134,\"p50_us\":472.417,\"p95_us\":903.433,\"p99_us\":978.202,\"requests\":190694,\"rps\":63517.06837300344,\"tls\":false}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 3.99,
+        "peak_rss_kib_including_startup_warmup": 5404,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 190694,
+      "elapsed_s": 3.002248134,
+      "rps": 63517.06837300344,
+      "p50_us": 472.417,
+      "p95_us": 903.433,
+      "p99_us": 978.202,
+      "client_cpu_s_including_warmup": 7.307383,
+      "server_log": "uWS echo ready on 127.0.0.1:18080\n"
+    },
+    {
+      "server": "zen",
+      "tls": false,
+      "connections": 32,
+      "body": 16384,
+      "trial": 1,
+      "seconds": 3.0,
+      "order": 1,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":16384,\"client_cpu_s_including_warmup\":7.791405,\"connections\":32,\"elapsed_s\":3.000989414,\"p50_us\":424.146,\"p95_us\":799.434,\"p99_us\":892.383,\"requests\":212078,\"rps\":70669.35958208615,\"tls\":false}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 4.0,
+        "peak_rss_kib_including_startup_warmup": 6140,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 212078,
+      "elapsed_s": 3.000989414,
+      "rps": 70669.35958208615,
+      "p50_us": 424.146,
+      "p95_us": 799.434,
+      "p99_us": 892.383,
+      "client_cpu_s_including_warmup": 7.791405,
+      "server_log": ""
+    },
+    {
+      "server": "zen",
+      "tls": false,
+      "connections": 32,
+      "body": 16384,
+      "trial": 2,
+      "seconds": 3.0,
+      "order": 0,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":16384,\"client_cpu_s_including_warmup\":7.962836,\"connections\":32,\"elapsed_s\":3.000667775,\"p50_us\":419.026,\"p95_us\":786.824,\"p99_us\":881.083,\"requests\":215341,\"rps\":71764.35918501507,\"tls\":false}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 3.99,
+        "peak_rss_kib_including_startup_warmup": 6144,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 215341,
+      "elapsed_s": 3.000667775,
+      "rps": 71764.35918501507,
+      "p50_us": 419.026,
+      "p95_us": 786.824,
+      "p99_us": 881.083,
+      "client_cpu_s_including_warmup": 7.962836,
+      "server_log": ""
+    },
+    {
+      "server": "uws",
+      "tls": false,
+      "connections": 32,
+      "body": 16384,
+      "trial": 2,
+      "seconds": 3.0,
+      "order": 1,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":16384,\"client_cpu_s_including_warmup\":7.214262,\"connections\":32,\"elapsed_s\":3.000526136,\"p50_us\":472.196,\"p95_us\":891.843,\"p99_us\":981.903,\"requests\":192115,\"rps\":64027.104345142754,\"tls\":false}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 3.99,
+        "peak_rss_kib_including_startup_warmup": 5396,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 192115,
+      "elapsed_s": 3.000526136,
+      "rps": 64027.104345142754,
+      "p50_us": 472.196,
+      "p95_us": 891.843,
+      "p99_us": 981.903,
+      "client_cpu_s_including_warmup": 7.214262,
+      "server_log": "uWS echo ready on 127.0.0.1:18080\n"
+    },
+    {
+      "server": "zen",
+      "tls": true,
+      "connections": 1,
+      "body": 64,
+      "trial": 0,
+      "seconds": 3.0,
+      "order": 0,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":64,\"client_cpu_s_including_warmup\":2.806043,\"connections\":1,\"elapsed_s\":3.000046499,\"p50_us\":36.949,\"p95_us\":47.619,\"p99_us\":54.209,\"requests\":76897,\"rps\":25631.936046868585,\"tls\":true}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 2.23,
+        "peak_rss_kib_including_startup_warmup": 9664,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 76897,
+      "elapsed_s": 3.000046499,
+      "rps": 25631.936046868585,
+      "p50_us": 36.949,
+      "p95_us": 47.619,
+      "p99_us": 54.209,
+      "client_cpu_s_including_warmup": 2.806043,
+      "server_log": ""
+    },
+    {
+      "server": "uws",
+      "tls": true,
+      "connections": 1,
+      "body": 64,
+      "trial": 0,
+      "seconds": 3.0,
+      "order": 1,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":64,\"client_cpu_s_including_warmup\":2.976986,\"connections\":1,\"elapsed_s\":3.00004979,\"p50_us\":36.049,\"p95_us\":43.2,\"p99_us\":51.639,\"requests\":82166,\"rps\":27388.212113639624,\"tls\":true}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 2.01,
+        "peak_rss_kib_including_startup_warmup": 9800,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 82166,
+      "elapsed_s": 3.00004979,
+      "rps": 27388.212113639624,
+      "p50_us": 36.049,
+      "p95_us": 43.2,
+      "p99_us": 51.639,
+      "client_cpu_s_including_warmup": 2.976986,
+      "server_log": "uWS echo ready on 127.0.0.1:18080\n"
+    },
+    {
+      "server": "uws",
+      "tls": true,
+      "connections": 1,
+      "body": 64,
+      "trial": 1,
+      "seconds": 3.0,
+      "order": 0,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":64,\"client_cpu_s_including_warmup\":2.940728,\"connections\":1,\"elapsed_s\":3.000050221,\"p50_us\":36.159,\"p95_us\":45.509,\"p99_us\":52.67,\"requests\":79112,\"rps\":26370.225220306405,\"tls\":true}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 2.01,
+        "peak_rss_kib_including_startup_warmup": 9808,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 79112,
+      "elapsed_s": 3.000050221,
+      "rps": 26370.225220306405,
+      "p50_us": 36.159,
+      "p95_us": 45.509,
+      "p99_us": 52.67,
+      "client_cpu_s_including_warmup": 2.940728,
+      "server_log": "uWS echo ready on 127.0.0.1:18080\n"
+    },
+    {
+      "server": "zen",
+      "tls": true,
+      "connections": 1,
+      "body": 64,
+      "trial": 1,
+      "seconds": 3.0,
+      "order": 1,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":64,\"client_cpu_s_including_warmup\":2.901646,\"connections\":1,\"elapsed_s\":3.000048579,\"p50_us\":36.71,\"p95_us\":46.369,\"p99_us\":53.4,\"requests\":77973,\"rps\":25990.579134552074,\"tls\":true}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 2.15,
+        "peak_rss_kib_including_startup_warmup": 9620,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 77973,
+      "elapsed_s": 3.000048579,
+      "rps": 25990.579134552074,
+      "p50_us": 36.71,
+      "p95_us": 46.369,
+      "p99_us": 53.4,
+      "client_cpu_s_including_warmup": 2.901646,
+      "server_log": ""
+    },
+    {
+      "server": "zen",
+      "tls": true,
+      "connections": 1,
+      "body": 64,
+      "trial": 2,
+      "seconds": 3.0,
+      "order": 0,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":64,\"client_cpu_s_including_warmup\":2.841974,\"connections\":1,\"elapsed_s\":3.00006251,\"p50_us\":37.59,\"p95_us\":47.18,\"p99_us\":54.519,\"requests\":76609,\"rps\":25535.801252354573,\"tls\":true}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 2.22,
+        "peak_rss_kib_including_startup_warmup": 9632,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 76609,
+      "elapsed_s": 3.00006251,
+      "rps": 25535.801252354573,
+      "p50_us": 37.59,
+      "p95_us": 47.18,
+      "p99_us": 54.519,
+      "client_cpu_s_including_warmup": 2.841974,
+      "server_log": ""
+    },
+    {
+      "server": "uws",
+      "tls": true,
+      "connections": 1,
+      "body": 64,
+      "trial": 2,
+      "seconds": 3.0,
+      "order": 1,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":64,\"client_cpu_s_including_warmup\":2.961618,\"connections\":1,\"elapsed_s\":3.00007406,\"p50_us\":35.36,\"p95_us\":42.239,\"p99_us\":49.789,\"requests\":85711,\"rps\":28569.628044449008,\"tls\":true}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 2.02,
+        "peak_rss_kib_including_startup_warmup": 9752,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 85711,
+      "elapsed_s": 3.00007406,
+      "rps": 28569.628044449008,
+      "p50_us": 35.36,
+      "p95_us": 42.239,
+      "p99_us": 49.789,
+      "client_cpu_s_including_warmup": 2.961618,
+      "server_log": "uWS echo ready on 127.0.0.1:18080\n"
+    },
+    {
+      "server": "zen",
+      "tls": true,
+      "connections": 1,
+      "body": 16384,
+      "trial": 0,
+      "seconds": 3.0,
+      "order": 0,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":16384,\"client_cpu_s_including_warmup\":2.894685,\"connections\":1,\"elapsed_s\":3.00010028,\"p50_us\":79.579,\"p95_us\":92.51,\"p99_us\":98.909,\"requests\":36796,\"rps\":12264.92335782856,\"tls\":true}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 2.47,
+        "peak_rss_kib_including_startup_warmup": 9652,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 36796,
+      "elapsed_s": 3.00010028,
+      "rps": 12264.92335782856,
+      "p50_us": 79.579,
+      "p95_us": 92.51,
+      "p99_us": 98.909,
+      "client_cpu_s_including_warmup": 2.894685,
+      "server_log": ""
+    },
+    {
+      "server": "uws",
+      "tls": true,
+      "connections": 1,
+      "body": 16384,
+      "trial": 0,
+      "seconds": 3.0,
+      "order": 1,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":16384,\"client_cpu_s_including_warmup\":2.782905,\"connections\":1,\"elapsed_s\":3.000046411,\"p50_us\":79.779,\"p95_us\":96.86,\"p99_us\":107.31,\"requests\":37759,\"rps\":12586.138621573478,\"tls\":true}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 2.25,
+        "peak_rss_kib_including_startup_warmup": 9912,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 37759,
+      "elapsed_s": 3.000046411,
+      "rps": 12586.138621573478,
+      "p50_us": 79.779,
+      "p95_us": 96.86,
+      "p99_us": 107.31,
+      "client_cpu_s_including_warmup": 2.782905,
+      "server_log": "uWS echo ready on 127.0.0.1:18080\n"
+    },
+    {
+      "server": "uws",
+      "tls": true,
+      "connections": 1,
+      "body": 16384,
+      "trial": 1,
+      "seconds": 3.0,
+      "order": 0,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":16384,\"client_cpu_s_including_warmup\":2.842,\"connections\":1,\"elapsed_s\":3.00005964,\"p50_us\":71.909,\"p95_us\":92.049,\"p99_us\":104.239,\"requests\":40612,\"rps\":13537.06421649671,\"tls\":true}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 2.24,
+        "peak_rss_kib_including_startup_warmup": 9876,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 40612,
+      "elapsed_s": 3.00005964,
+      "rps": 13537.06421649671,
+      "p50_us": 71.909,
+      "p95_us": 92.049,
+      "p99_us": 104.239,
+      "client_cpu_s_including_warmup": 2.842,
+      "server_log": "uWS echo ready on 127.0.0.1:18080\n"
+    },
+    {
+      "server": "zen",
+      "tls": true,
+      "connections": 1,
+      "body": 16384,
+      "trial": 1,
+      "seconds": 3.0,
+      "order": 1,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":16384,\"client_cpu_s_including_warmup\":3.039535,\"connections\":1,\"elapsed_s\":3.000051601,\"p50_us\":79.62,\"p95_us\":92.489,\"p99_us\":100.419,\"requests\":37046,\"rps\":12348.454269137086,\"tls\":true}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 2.48,
+        "peak_rss_kib_including_startup_warmup": 9616,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 37046,
+      "elapsed_s": 3.000051601,
+      "rps": 12348.454269137086,
+      "p50_us": 79.62,
+      "p95_us": 92.489,
+      "p99_us": 100.419,
+      "client_cpu_s_including_warmup": 3.039535,
+      "server_log": ""
+    },
+    {
+      "server": "zen",
+      "tls": true,
+      "connections": 1,
+      "body": 16384,
+      "trial": 2,
+      "seconds": 3.0,
+      "order": 0,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":16384,\"client_cpu_s_including_warmup\":2.994613,\"connections\":1,\"elapsed_s\":3.000077441,\"p50_us\":79.609,\"p95_us\":93.94,\"p99_us\":102.249,\"requests\":37706,\"rps\":12568.342231669745,\"tls\":true}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 2.45,
+        "peak_rss_kib_including_startup_warmup": 9656,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 37706,
+      "elapsed_s": 3.000077441,
+      "rps": 12568.342231669745,
+      "p50_us": 79.609,
+      "p95_us": 93.94,
+      "p99_us": 102.249,
+      "client_cpu_s_including_warmup": 2.994613,
+      "server_log": ""
+    },
+    {
+      "server": "uws",
+      "tls": true,
+      "connections": 1,
+      "body": 16384,
+      "trial": 2,
+      "seconds": 3.0,
+      "order": 1,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":16384,\"client_cpu_s_including_warmup\":2.813626,\"connections\":1,\"elapsed_s\":3.00007222,\"p50_us\":76.31,\"p95_us\":96.719,\"p99_us\":105.28,\"requests\":38428,\"rps\":12809.024977405377,\"tls\":true}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 2.21,
+        "peak_rss_kib_including_startup_warmup": 9888,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 38428,
+      "elapsed_s": 3.00007222,
+      "rps": 12809.024977405377,
+      "p50_us": 76.31,
+      "p95_us": 96.719,
+      "p99_us": 105.28,
+      "client_cpu_s_including_warmup": 2.813626,
+      "server_log": "uWS echo ready on 127.0.0.1:18080\n"
+    },
+    {
+      "server": "zen",
+      "tls": true,
+      "connections": 32,
+      "body": 64,
+      "trial": 0,
+      "seconds": 3.0,
+      "order": 0,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":64,\"client_cpu_s_including_warmup\":7.084041,\"connections\":32,\"elapsed_s\":3.000660116,\"p50_us\":361.537,\"p95_us\":653.135,\"p99_us\":741.974,\"requests\":253433,\"rps\":84459.08240278687,\"tls\":true}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 4.01,
+        "peak_rss_kib_including_startup_warmup": 11396,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 253433,
+      "elapsed_s": 3.000660116,
+      "rps": 84459.08240278687,
+      "p50_us": 361.537,
+      "p95_us": 653.135,
+      "p99_us": 741.974,
+      "client_cpu_s_including_warmup": 7.084041,
+      "server_log": ""
+    },
+    {
+      "server": "uws",
+      "tls": true,
+      "connections": 32,
+      "body": 64,
+      "trial": 0,
+      "seconds": 3.0,
+      "order": 1,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":64,\"client_cpu_s_including_warmup\":7.191881,\"connections\":32,\"elapsed_s\":3.001061843,\"p50_us\":354.438,\"p95_us\":664.476,\"p99_us\":724.575,\"requests\":257095,\"rps\":85668.01134061135,\"tls\":true}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 4.01,
+        "peak_rss_kib_including_startup_warmup": 11392,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 257095,
+      "elapsed_s": 3.001061843,
+      "rps": 85668.01134061135,
+      "p50_us": 354.438,
+      "p95_us": 664.476,
+      "p99_us": 724.575,
+      "client_cpu_s_including_warmup": 7.191881,
+      "server_log": "uWS echo ready on 127.0.0.1:18080\n"
+    },
+    {
+      "server": "uws",
+      "tls": true,
+      "connections": 32,
+      "body": 64,
+      "trial": 1,
+      "seconds": 3.0,
+      "order": 0,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":64,\"client_cpu_s_including_warmup\":7.2113700000000005,\"connections\":32,\"elapsed_s\":3.000756975,\"p50_us\":347.777,\"p95_us\":647.715,\"p99_us\":713.775,\"requests\":262028,\"rps\":87320.63348782186,\"tls\":true}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 4.0,
+        "peak_rss_kib_including_startup_warmup": 11344,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 262028,
+      "elapsed_s": 3.000756975,
+      "rps": 87320.63348782186,
+      "p50_us": 347.777,
+      "p95_us": 647.715,
+      "p99_us": 713.775,
+      "client_cpu_s_including_warmup": 7.2113700000000005,
+      "server_log": "uWS echo ready on 127.0.0.1:18080\n"
+    },
+    {
+      "server": "zen",
+      "tls": true,
+      "connections": 32,
+      "body": 64,
+      "trial": 1,
+      "seconds": 3.0,
+      "order": 1,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":64,\"client_cpu_s_including_warmup\":7.244167,\"connections\":32,\"elapsed_s\":3.000646716,\"p50_us\":351.267,\"p95_us\":649.705,\"p99_us\":716.764,\"requests\":259886,\"rps\":86609.995976614,\"tls\":true}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 4.0,
+        "peak_rss_kib_including_startup_warmup": 11328,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 259886,
+      "elapsed_s": 3.000646716,
+      "rps": 86609.995976614,
+      "p50_us": 351.267,
+      "p95_us": 649.705,
+      "p99_us": 716.764,
+      "client_cpu_s_including_warmup": 7.244167,
+      "server_log": ""
+    },
+    {
+      "server": "zen",
+      "tls": true,
+      "connections": 32,
+      "body": 64,
+      "trial": 2,
+      "seconds": 3.0,
+      "order": 0,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":64,\"client_cpu_s_including_warmup\":7.0214110000000005,\"connections\":32,\"elapsed_s\":3.000738345,\"p50_us\":358.567,\"p95_us\":655.275,\"p99_us\":731.565,\"requests\":255368,\"rps\":85101.72185639199,\"tls\":true}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 4.01,
+        "peak_rss_kib_including_startup_warmup": 11228,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 255368,
+      "elapsed_s": 3.000738345,
+      "rps": 85101.72185639199,
+      "p50_us": 358.567,
+      "p95_us": 655.275,
+      "p99_us": 731.565,
+      "client_cpu_s_including_warmup": 7.0214110000000005,
+      "server_log": ""
+    },
+    {
+      "server": "uws",
+      "tls": true,
+      "connections": 32,
+      "body": 64,
+      "trial": 2,
+      "seconds": 3.0,
+      "order": 1,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":64,\"client_cpu_s_including_warmup\":7.152704,\"connections\":32,\"elapsed_s\":3.001042674,\"p50_us\":353.127,\"p95_us\":661.306,\"p99_us\":721.184,\"requests\":258416,\"rps\":86108.73888559708,\"tls\":true}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 4.01,
+        "peak_rss_kib_including_startup_warmup": 11440,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 258416,
+      "elapsed_s": 3.001042674,
+      "rps": 86108.73888559708,
+      "p50_us": 353.127,
+      "p95_us": 661.306,
+      "p99_us": 721.184,
+      "client_cpu_s_including_warmup": 7.152704,
+      "server_log": "uWS echo ready on 127.0.0.1:18080\n"
+    },
+    {
+      "server": "zen",
+      "tls": true,
+      "connections": 32,
+      "body": 16384,
+      "trial": 0,
+      "seconds": 3.0,
+      "order": 0,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":16384,\"client_cpu_s_including_warmup\":4.982995,\"connections\":32,\"elapsed_s\":3.001543961,\"p50_us\":1138.351,\"p95_us\":2023.375,\"p99_us\":2333.473,\"requests\":80402,\"rps\":26786.880700295696,\"tls\":true}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 4.01,
+        "peak_rss_kib_including_startup_warmup": 12564,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 80402,
+      "elapsed_s": 3.001543961,
+      "rps": 26786.880700295696,
+      "p50_us": 1138.351,
+      "p95_us": 2023.375,
+      "p99_us": 2333.473,
+      "client_cpu_s_including_warmup": 4.982995,
+      "server_log": ""
+    },
+    {
+      "server": "uws",
+      "tls": true,
+      "connections": 32,
+      "body": 16384,
+      "trial": 0,
+      "seconds": 3.0,
+      "order": 1,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":16384,\"client_cpu_s_including_warmup\":5.5957419999999995,\"connections\":32,\"elapsed_s\":3.002012956,\"p50_us\":944.833,\"p95_us\":1706.627,\"p99_us\":1929.175,\"requests\":97200,\"rps\":32378.274652589473,\"tls\":true}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 4.01,
+        "peak_rss_kib_including_startup_warmup": 11860,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 97200,
+      "elapsed_s": 3.002012956,
+      "rps": 32378.274652589473,
+      "p50_us": 944.833,
+      "p95_us": 1706.627,
+      "p99_us": 1929.175,
+      "client_cpu_s_including_warmup": 5.5957419999999995,
+      "server_log": "uWS echo ready on 127.0.0.1:18080\n"
+    },
+    {
+      "server": "uws",
+      "tls": true,
+      "connections": 32,
+      "body": 16384,
+      "trial": 1,
+      "seconds": 3.0,
+      "order": 0,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":16384,\"client_cpu_s_including_warmup\":4.7668610000000005,\"connections\":32,\"elapsed_s\":3.001853158,\"p50_us\":951.143,\"p95_us\":1059.971,\"p99_us\":1929.456,\"requests\":97450,\"rps\":32463.28013756894,\"tls\":true}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 4.01,
+        "peak_rss_kib_including_startup_warmup": 11900,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 97450,
+      "elapsed_s": 3.001853158,
+      "rps": 32463.28013756894,
+      "p50_us": 951.143,
+      "p95_us": 1059.971,
+      "p99_us": 1929.456,
+      "client_cpu_s_including_warmup": 4.7668610000000005,
+      "server_log": "uWS echo ready on 127.0.0.1:18080\n"
+    },
+    {
+      "server": "zen",
+      "tls": true,
+      "connections": 32,
+      "body": 16384,
+      "trial": 1,
+      "seconds": 3.0,
+      "order": 1,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":16384,\"client_cpu_s_including_warmup\":4.126696,\"connections\":32,\"elapsed_s\":3.0014519,\"p50_us\":1224.561,\"p95_us\":1338.961,\"p99_us\":2482.721,\"requests\":75703,\"rps\":25222.126664765143,\"tls\":true}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 4.02,
+        "peak_rss_kib_including_startup_warmup": 12736,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 75703,
+      "elapsed_s": 3.0014519,
+      "rps": 25222.126664765143,
+      "p50_us": 1224.561,
+      "p95_us": 1338.961,
+      "p99_us": 2482.721,
+      "client_cpu_s_including_warmup": 4.126696,
+      "server_log": ""
+    },
+    {
+      "server": "zen",
+      "tls": true,
+      "connections": 32,
+      "body": 16384,
+      "trial": 2,
+      "seconds": 3.0,
+      "order": 0,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":16384,\"client_cpu_s_including_warmup\":4.011317,\"connections\":32,\"elapsed_s\":3.001568499,\"p50_us\":1228.85,\"p95_us\":1942.915,\"p99_us\":2485.961,\"requests\":73800,\"rps\":24587.145029202948,\"tls\":true}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 4.01,
+        "peak_rss_kib_including_startup_warmup": 12584,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 73800,
+      "elapsed_s": 3.001568499,
+      "rps": 24587.145029202948,
+      "p50_us": 1228.85,
+      "p95_us": 1942.915,
+      "p99_us": 2485.961,
+      "client_cpu_s_including_warmup": 4.011317,
+      "server_log": ""
+    },
+    {
+      "server": "uws",
+      "tls": true,
+      "connections": 32,
+      "body": 16384,
+      "trial": 2,
+      "seconds": 3.0,
+      "order": 1,
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{\"body\":16384,\"client_cpu_s_including_warmup\":4.653275,\"connections\":32,\"elapsed_s\":3.00156944,\"p50_us\":952.683,\"p95_us\":1624.438,\"p99_us\":1927.626,\"requests\":96027,\"rps\":31992.2633540672,\"tls\":true}\n",
+      "stderr": "",
+      "server_resources": {
+        "cpu_s_including_startup_warmup": 4.01,
+        "peak_rss_kib_including_startup_warmup": 12004,
+        "observed_cpu_affinity": [
+          2
+        ]
+      },
+      "requests": 96027,
+      "elapsed_s": 3.00156944,
+      "rps": 31992.2633540672,
+      "p50_us": 952.683,
+      "p95_us": 1624.438,
+      "p99_us": 1927.626,
+      "client_cpu_s_including_warmup": 4.653275,
+      "server_log": "uWS echo ready on 127.0.0.1:18080\n"
+    }
+  ]
+}
