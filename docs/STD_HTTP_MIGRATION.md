@@ -69,8 +69,19 @@ real actor delivery, JSON decoding of an owned H2 chunk, and type-checking the
 generic streaming request API. The new runner uses UBSan, and both runners are
 included in `scripts/check.sh` without adding Python crypto dependencies.
 
-Validation: the full macOS `scripts/check.sh` run passed with the rebuilt
-compiler and std sources after removing std HTTP. This includes all seven
+Validation: the full macOS and Linux `scripts/check.sh` runs passed with the
+rebuilt compiler and std sources after removing std HTTP. This includes all seven
 migrated corpus cases, TLS verification/ALPN checks, actor delivery, server
 readiness cleanup and UBSan targets. This migration changes ownership and
 imports; it makes no new performance claim.
+
+The Linux run used compiler/std `b2b318849cde58169292fe12a2969cf339fc6546`,
+zen-http `f5ff09586c8369129acb136b9c7cc9845c666945`, and zen-openssl
+`0ea91ad665d3ae85a5f37d0b0b648510ee3a3ba4`. All four remaining std network
+corpus cases also passed on both systems. Linux passed the compiler warning
+gate at unchanged seed budgets (GCC 315, Clang 320) and emitted-code budgets
+(GCC 1, Clang 6). The full local macOS compiler gate still encounters its
+pre-existing SDK warning-count mismatch (321 versus the Linux baseline 320);
+this was not hidden by increasing the budget. Linux logs are retained on the
+validation host under
+`~/zen-native-crypto-validation-20260928/remove-http-{build,warnings,net,package}.log`.
