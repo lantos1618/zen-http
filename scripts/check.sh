@@ -24,6 +24,7 @@ clang -O2 -g -fsanitize=undefined -fno-sanitize-recover=all build/chunked-test.c
 ./build/chunked-test
 "$python" tests/check.py
 "$python" tests/disconnect.py
+"$python" scripts/check-client-corpus.py
 "$python" scripts/check-http2.py
 "$python" scripts/check-http2-server.py
 "$python" scripts/check-http2-request.py

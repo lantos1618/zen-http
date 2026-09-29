@@ -1,0 +1,55 @@
+Actor, ActorError, ActorStartError, Context, Ref = std.actor
+H2Chunk, H2Client, H2Error, H2StreamError, h2_chunk = http.http2
+JsonEvent, JsonFault, to_json = std.json
+
+Post = {
+    prompt: str,
+    stream: bool,
+}
+
+Receiver = {}
+
+Receiver.impl(Actor, {
+    receive = (self :: @Self, ctx: Context, chunk: H2Chunk) {
+        chunk.copy(ctx.alloc).match({
+            Ok(text) => println("data {}", text.view()),
+            Err(_)   => println("data allocation failed"),
+        })
+    }
+})
+
+// Type-check the public request door without opening a socket.
+stream_call = (
+    client   :: H2Client,
+    alloc    : Alloc,
+    headers  : Vec<str>,
+    body     : str,
+    receiver : Ref<Receiver>
+) Res<(), H2StreamError> {
+    client.post_stream(alloc, headers, body, receiver)
+}
+
+Error = AllocError | ActorStartError | ActorError | H2Error | JsonFault
+
+// The same owned chunk the actor receives is a byte Range, so JSON decoding
+// neither knows about HTTP/2 nor copies the frame through a String first.
+decode_chunk = (a: Alloc, chunk: H2Chunk) Res<(), JsonFault> {
+    decoder ::= a.Decoder().try();
+    events  ::= a.Vec<JsonEvent>();
+    decoder.feed(chunk, events).try();
+    decoder.finish(events)
+}
+
+main = (env: Env) Res<(), Error> {
+    alloc ::= env.mem.alloc();
+    receiver = env.spawn(Receiver()).try();
+    post     = Post(prompt: "hello", stream: true);
+    body     = post.to_json(alloc).try();
+    headers ::= alloc.Vec<str>();
+    headers.add("authorization: Bearer test").try();
+    println("{}", body.view());
+    decode_chunk(alloc, h2_chunk("null").try()).try();
+    receiver.receive(h2_chunk("hello").try()).try();
+    receiver.stop();
+    Ok(())
+}

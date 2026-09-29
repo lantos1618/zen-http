@@ -67,46 +67,29 @@ unsupported nested-native-record addresses. OS readiness still bridges native
 kqueue/epoll layouts and macros. Generated C emitted by the Zen compiler is a
 separate build artifact, not a reason to keep handwritten policy in headers.
 
-## Existing standard-library overlap
+## Standard-library boundary
 
-`std.net.http`, `std.net.http2` and `std.net.tls` still contain implementations.
-`std/std.zen` re-exports their types, and `Env.http` constructs the old
-`std.net.http.HttpClient`. Publishing these packages did not migrate those
-callers. Package TLS names also differ (`Transport`/`TlsFault` versus
-`Stream`/`TlsError`); replacing imports blindly is not a compatibility plan.
+HTTP/1 and HTTP/2 implementations, their std exports and `env.net.http()` have
+been removed from the compiler's standard library. Applications explicitly
+import `zen-http`; there is no std compatibility facade or automatic package
+fetch. [The migration guide](STD_HTTP_MIGRATION.md) lists the replacement imports
+and all seven preserved client/actor corpus fixtures.
 
-The package currently uses sibling paths in `build.zen`. Public Git repositories
-are available, but a versioned package install and standard-library dependency
-integration are not established by that alone.
+`std.net.tls` remains a separate compatibility implementation. Its
+`Stream`/`TlsError` names differ from package `Transport`/`TlsFault`, so the HTTP
+removal does not imply that TLS callers can replace imports blindly.
 
-## Migration sequence and gates
+The package uses sibling paths in `build.zen`. Public repositories do not by
+themselves provide versioned package installation. Reproducible dependency
+resolution remains work to do; no package-to-std-to-package import cycle was
+introduced to preserve old HTTP names.
 
-1. Move portable connection and readiness policy into Zen. Upstream reusable
-   nonblocking socket operations, monotonic time and a portable readiness API
-   into `std`, backed by the minimum OS ABI bindings. Keep HTTP status, ALPN,
-   headers and connection limits out of that generic layer. Remove corresponding
-   package adapters only after macOS/Linux backpressure, EOF, descriptor cleanup,
-   readiness and disconnect tests pass against the upstream primitive.
-2. Make package versions and dependency resolution reproducible without local
-   sibling checkout assumptions. Choose a pinned bundled source snapshot if the
-   compiler distribution cannot yet resolve packages. Such a snapshot must be
-   mechanically synchronized from one canonical source, not edited as a fork.
-3. Add compatibility facades for the existing `std.net.http`, `std.net.http2`,
-   `std.net.tls`, top-level exports and `Env.http`. Preserve public names, errors,
-   ownership/drop behavior and verified TLS defaults. Ensure compiler bootstrap
-   builds offline and avoids a package-to-std-to-package import cycle. If those
-   constraints cannot be met, retain the existing API until an explicit breaking
-   release rather than introducing a hidden network/build dependency.
-4. Run existing standard-library client/actor tests through the facades, plus
-   package plain/TLS, certificate rejection, H2, allocation-failure and cleanup
-   tests. Only then remove the duplicated std implementations. Test upgrades
-   from existing caller examples, not just freshly rewritten package examples.
-
-The experimental H2 server (one active TCP connection, bounded streams, incomplete
-error distinctions) should not become a default std API yet. HTTP/1 and TLS also
-remain experimental. Generic primitives can be upstreamed independently of that
-stabilization. This document is the migration design; it does not claim the
-compiler repository or `Env.http` has already been changed.
+Generic nonblocking sockets, readiness, clocks and memory can continue to be
+upstreamed independently. HTTP status, headers, ALPN choices and connection
+limits remain package policy. Package tests now own HTTP client/actor coverage,
+alongside plain/TLS, certificate rejection, H2, allocation-failure and cleanup
+checks. The experimental H2 server and native PSK HTTP client have not become
+default standard-library APIs.
 
 Validation of this conversion: the full macOS HTTP package check script passes,
 including trusted/untrusted TLS clients, h2 ALPN acceptance/rejection, HTTP/2

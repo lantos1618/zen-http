@@ -29,8 +29,9 @@ connection behavior; this conversion does not introduce a multiplexed listener.
 The current compiler actor backend uses one pthread worker per actor and
 condition-variable mailbox wakeups. It does not provide a network event loop.
 Readiness can underpin an actor-owned loop, but actor-per-socket threads and
-mailbox-to-reactor wakeup integration are outside this change. We leave existing
-standard-library HTTP protocol modules and `Env.http` behavior untouched.
+mailbox-to-reactor wakeup integration are outside this change. That readiness change did not migrate HTTP callers. The later removal of std
+HTTP and `env.net.http()` uses explicit package imports; see
+[the migration guide](STD_HTTP_MIGRATION.md).
 
 Correctness checks cover HTTP/1, TLS, disconnects and experimental H2. Historical
 throughput results predate this migration; no performance improvement is claimed.

@@ -4,9 +4,11 @@ Standalone HTTP library for Zen. An experimental native TLS client path uses
 `zen-crypto`; certificate-verified HTTPS still uses OpenSSL. HTTP belongs here; OpenSSL-backed TLS belongs
 in the sibling `zen-openssl` package. `zen-crypto` contains native Zen algorithms
 and `zen-sodium` separately exposes libsodium bindings. Standard-library allocation,
-bytes and OS socket primitives remain underneath both. The existing
-`std.net.http`, `std.net.http2` and `std.net.tls` modules are still present for
-existing applications; this package does not silently redirect `Env.http`.
+bytes and OS socket primitives remain underneath both.
+HTTP/1 and HTTP/2 have moved out of std. Replace `std.net.http`,
+`std.net.http2` and `env.net.http()` with explicit package imports and client
+construction; see [migration instructions](docs/STD_HTTP_MIGRATION.md).
+`std.net.tls` is a separate compatibility surface.
 
 ```mermaid
 flowchart TD
@@ -63,10 +65,9 @@ HTTP/2 endpoint is a separate experimental server. This is an experimental packa
 
 See [the audited boundary and migration gates](docs/NATIVE_BOUNDARY.md). HTTP
 protocol logic is Zen; OS adapters and vetted cryptographic backends remain
-native dependencies. The public packages and old std clients currently overlap.
-The intended migration keeps one canonical protocol implementation and preserves
-existing std APIs through compatibility facades after dependency/build support
-and behavior checks are in place. `Env.http` has not yet been redirected.
+native dependencies. HTTP protocol implementations belong to this package. The std HTTP clients and
+`env.net.http()` accessor have been removed; applications must explicitly depend
+on the package. No std HTTP compatibility facade is installed.
 
 ## Build and verify
 
