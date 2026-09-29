@@ -40,8 +40,9 @@ handshake-message accumulation, directional sequences, authenticated plaintext
 remaining to deliver, and ciphertext remaining to write. Its proposed boundary
 accepts bounded ciphertext input, exposes bounded pending output, acknowledges
 bytes written, and reports progress such as `NeedInput`, `NeedOutput`,
-`Runnable`, `Established`, or a terminal error. These names are illustrative;
-there is no such API today. Buffer ownership and view lifetimes must be explicit.
+`Runnable`, `Established`, or a terminal error. These names describe a proposed
+unified handshake boundary; there is no resumable handshake API yet. Buffer
+ownership and view lifetimes must be explicit.
 
 A record is sealed once and retained across partial writes. Retries must never
 re-encrypt plaintext or consume another sequence number. Authentication and
@@ -92,6 +93,32 @@ message-size, empty-record and parser limits must survive the refactor.
    kernel event. Run HTTP framing, pipelining and shutdown regressions on macOS
    and Linux, plus sanitizer checks and a deliberate stalled-progress control.
    Inspect the final executable/link inputs for absence of OpenSSL and libsodium.
+
+## Next extraction: server handshake
+
+The smallest server integration step is to make `tls13_psk_dhe_accept` a
+blocking driver over a resumable server handshake. Reuse its existing
+ClientHello parser, binder verification and key-schedule functions. Retain
+phases for receiving ClientHello, preparing and sending ServerHello, sending
+the encrypted flight, receiving client Finished, and establishing the session.
+Partial output acknowledgements must never rebuild or reseal either flight.
+Preserve the existing record-count, CCS-count and handshake-size limits.
+
+The handshake workspace at `34000..99536` overlaps the established record
+engine's input buffers. Do not call `Tls13Session.feed` during the handshake.
+Keep the current handshake layout until authentication completes, retain
+unconsumed input at the adapter, and stop consuming input while a flight is
+pending. Transfer the allocations into the established session exactly once,
+after client Finished is verified and the server flight has been acknowledged.
+The resumable API must define PSK/identity lifetimes beyond a single call and
+release allocations on cancellation or any terminal error.
+
+Gate this extraction with fragmented ClientHello/Finished, bytewise record
+headers, short and zero output acknowledgements, EOF at every phase, malformed
+CCS, replay, and failed ownership handoff. Re-run independent Python, OpenSSL
+and native-pair checks. Only subsequent real reactor tests can establish that
+one stalled handshake does not block another connection; X25519 still requires
+bounded admission and scheduling even after socket waits become resumable.
 
 ## Scope and remaining limits
 
