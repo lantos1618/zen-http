@@ -1,8 +1,9 @@
 # Native TLS integration with the HTTP reactor
 
-This is a proposed migration, not an implemented server backend. Native Zen
-TLS currently supports blocking external-PSK connections, including X25519
-PSK-DHE client/server roles and reusable record sessions. The HTTP reactor
+This is a staged migration, not an implemented server backend. Native Zen
+TLS supports blocking external-PSK handshakes, including X25519 PSK-DHE
+client/server roles. Established sessions now expose resumable application
+record progress as well as the existing blocking driver. The HTTP reactor
 still uses the zen-openssl transport. The native HTTP client adapter consumes
 an already authenticated blocking session.
 
@@ -16,10 +17,12 @@ an already authenticated blocking session.
 - `src/http/server.zen` limits each drive round to 64 transitions/eight responses
   and uses std readiness plus a local runnable queue. Connection descriptors
   are copied between slot storage and local variables.
-- In zen-crypto, `src/tls13_server.zen` and `src/tls13_session.zen` perform
-  read-exact/write-all loops. `SocketFd` maps syscall failures to socket faults;
-  it does not expose recoverable EAGAIN to these callers. The current native
-  session treats an I/O error as terminal and releases its storage.
+- In zen-crypto, handshake functions still perform blocking I/O. The session
+  now retains partial ciphertext input and pending output through `feed`,
+  `queue_record`, `pending_output`, `acknowledge`, and `read_plaintext`. Its
+  blocking driver uses that same record engine. `SocketFd` still maps syscall
+  failures to socket faults; calling the blocking driver on a nonblocking
+  descriptor treats EAGAIN as terminal. No reactor socket adapter exists yet.
 
 Calling the blocking native accept/read/write APIs from this reactor would
 therefore block other connections or abort on ordinary nonblocking backpressure.
@@ -27,8 +30,9 @@ Wrapping those calls in an actor does not solve the transport contract.
 
 ## Shared protocol engine
 
-Refactor zen-crypto into one resumable protocol engine, then make both blocking
-and reactor adapters drive it. Do not create an HTTP-specific copy of TLS
+Continue extracting one resumable protocol engine in zen-crypto, then make both
+blocking and reactor adapters drive it. Application records now share such an
+engine; the handshake remains to be converted. Do not create an HTTP-specific copy of TLS
 parsing, transcript handling, key derivation, or record protection.
 
 The engine needs persistent handshake phase, partial header/body offsets,
@@ -53,12 +57,14 @@ message-size, empty-record and parser limits must survive the refactor.
 
 ## Migration and verification gates
 
-1. **Extract record progress in zen-crypto.** Add retained read/write offsets and
-   output queuing. Drive the existing blocking session through the same engine.
-   Gate: all current vectors, tampering, replay, truncation, partial-read,
-   shutdown, alignment and exactly-once cleanup tests still pass. Scripted I/O
-   must force short reads/writes, EAGAIN and EINTR at record boundaries and
-   within headers, ciphertext and tags; verify no duplicate output or nonce use.
+1. **Record progress is implemented in zen-crypto.** Established sessions
+   retain partial header/body input and sealed output until acknowledged. The
+   blocking session uses these same transitions. Byte-fed tests cover partial
+   and zero-progress retries, independent ciphertext agreement, duplex storage,
+   malformed input, closure and exactly-once cleanup. These simulate transport
+   progress; they do not exercise actual OS EAGAIN/EINTR. The eventual socket
+   adapter must add those tests and preserve queued ciphertext across them.
+   See [the session contract](https://github.com/lantos1618/zen-crypto/blob/main/docs/TLS13.md#resumable-application-records).
 
 2. **Make the handshake resumable.** Persist ClientHello/ServerHello, transcript,
    flight and Finished phases instead of retaining execution inside socket
@@ -102,3 +108,10 @@ separate optimization. Passing
 interoperability and sanitizer tests is not a security audit, secure-erasure
 proof, or evidence of beating uWebSockets. Performance comparisons follow only
 after equivalent behavior and fair workloads are established.
+
+The record-engine milestone is published in zen-crypto `81189a6`. Existing
+native HTTP regressions pass through its shared blocking driver on macOS
+(UBSan) and Linux (ASan and UBSan): 207 parser split cases, eight parser
+rejections and eight encrypted exchange cases. The runner now treats generated
+comparison-parenthesis warnings as errors. [Validation details](https://github.com/lantos1618/zen-crypto/blob/main/tests/validation/tls13-record-progress-2026-09-29.txt)
+record the exact compiler, source revision and limits.

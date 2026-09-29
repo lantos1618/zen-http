@@ -31,7 +31,7 @@ def build(source):
     (STAGE / 'main.zen').write_text(source)
     with (WORK / 'compile.log').open('w') as log:
         subprocess.run([str(ZEN), 'build', str(STAGE), '--std', str(STD), '--emit-c', '-o', str(WORK / 'client.c')], check=True, stdout=log, stderr=log)
-        subprocess.run([os.environ.get('CC','clang'), '-O2', '-Wno-parentheses-equality', '-fsanitize=' + os.environ.get('SANITIZERS', 'undefined'), '-fno-sanitize-recover=all', str(WORK / 'client.c'), '-o', str(WORK / 'client')], check=True, stdout=log, stderr=log)
+        subprocess.run([os.environ.get('CC','clang'), '-O2', '-Werror=parentheses-equality', '-fsanitize=' + os.environ.get('SANITIZERS', 'undefined'), '-fno-sanitize-recover=all', str(WORK / 'client.c'), '-o', str(WORK / 'client')], check=True, stdout=log, stderr=log)
     symbols = subprocess.check_output(['nm', '-u', str(WORK / 'client')], text=True)
     assert not re.search(r'\b_?(?:SSL_|OPENSSL_|EVP_|sodium_|crypto_|randombytes)', symbols), symbols
     return WORK / 'client'
