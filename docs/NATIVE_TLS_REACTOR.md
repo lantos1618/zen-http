@@ -96,7 +96,7 @@ separate until their required contracts are implemented and tested.
 Current TLS storage requests total 212768 bytes per active session, before HTTP
 buffers and metadata: about 52 MiB for 256 sessions. The initial migration should
 make allocation/admission limits explicit; shrinking handshake storage is a
-subsequent optimization, not a prerequisite for copying protocol code. Passing
+separate optimization. Passing
 interoperability and sanitizer tests is not a security audit, secure-erasure
 proof, or evidence of beating uWebSockets. Performance comparisons follow only
 after equivalent behavior and fair workloads are established.

@@ -12,6 +12,8 @@ existing applications; this package does not silently redirect `Env.http`.
 flowchart TD
     app[Zen applications] --> http[zen-http: HTTP client and server]
     http --> tls[zen-openssl: TLS policy and OpenSSL bindings]
+    http --> crypto[zen-crypto: explicit native PSK TLS client path]
+    crypto --> std
     http --> std[std: memory, bytes and OS primitives]
     tls --> std
     tls --> native[OpenSSL]
@@ -139,7 +141,10 @@ It checks native-only linkage, borrowed-session sequence continuity and
 exactly-once session cleanup under UBSan. `SANITIZERS=address,undefined` enables
 both sanitizers on supported hosts. This is an experimental blocking client;
 the event-driven HTTP server and HTTP/2 TLS still use OpenSSL. Existing benchmark
-results do not measure this native TLS path.
+results do not measure this native TLS path. See the [Linux validation report](docs/NATIVE_HTTP_VALIDATION.md)
+for exact revisions, sanitizer coverage and retained limitations. The proposed
+[next server integration](docs/NATIVE_TLS_REACTOR.md) makes TLS resumable before
+connecting it to the HTTP reactor.
 
 ## Benchmark contract
 
