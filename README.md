@@ -1,6 +1,7 @@
 # zen-http
 
-Standalone HTTP library for Zen. HTTP belongs here; OpenSSL-backed TLS belongs
+Standalone HTTP library for Zen. An experimental native TLS client path uses
+`zen-crypto`; certificate-verified HTTPS still uses OpenSSL. HTTP belongs here; OpenSSL-backed TLS belongs
 in the sibling `zen-openssl` package. `zen-crypto` contains native Zen algorithms
 and `zen-sodium` separately exposes libsodium bindings. Standard-library allocation,
 bytes and OS socket primitives remain underneath both. The existing
@@ -109,6 +110,36 @@ It binds only `127.0.0.1:18080`. Generated certificates are local test fixtures.
 The extracted TLS client verifies certificates and hostnames; a private
 OpenSSL build needs an explicit trusted CA bundle, e.g. `SSL_CERT_FILE`.
 It does not automatically use the macOS Keychain.
+
+## Experimental native TLS client
+
+`http.native_client` exposes `post_over_native_session` and
+`post_over_native_session_into`. Both borrow an already authenticated
+`zen-crypto.Tls13Session` and use the same HTTP response decoder as the existing
+client. This path links no OpenSSL or libsodium. Import this module directly;
+the current `http` facade and normal build still include the OpenSSL backend.
+
+The caller establishes the external-PSK TLS session and owns its socket,
+allocator, peer identity, fresh handshake randomness and deadlines. A URL's
+hostname is **not** certificate-verified by this API. Only `https` URLs are
+accepted. Use one request per session and close or abort it afterwards, even
+on errors: the decoder can read ahead beyond a response boundary. Streaming
+output can contain an authenticated prefix when a later operation fails.
+
+With a sibling `zen-crypto` checkout and Python's `cryptography` installed:
+
+```sh
+ZEN_COMPILER=../zen-actor-runtime/zen ZEN_STD=../zen-actor-runtime/src \
+python3 scripts/check-native-http.py
+```
+
+The check covers 215 decoder cases and eight encrypted scenarios, including
+chunked and close-delimited responses, bad framing, tampering and raw EOF.
+It checks native-only linkage, borrowed-session sequence continuity and
+exactly-once session cleanup under UBSan. `SANITIZERS=address,undefined` enables
+both sanitizers on supported hosts. This is an experimental blocking client;
+the event-driven HTTP server and HTTP/2 TLS still use OpenSSL. Existing benchmark
+results do not measure this native TLS path.
 
 ## Benchmark contract
 

@@ -7,7 +7,11 @@ its implementation back into `std`: two independently edited copies drift.
 
 The current package split keeps native Zen algorithms in `zen-crypto`, OpenSSL
 TLS integration in `zen-openssl`, and libsodium bindings in `zen-sodium`.
-zen-http depends on zen-openssl for TLS. The source inventory below is historical
+The default zen-http client, event-driven server and HTTP/2 use zen-openssl.
+The explicit `http.native_client` module instead borrows a native zen-crypto
+TLS session, with no OpenSSL linkage. It currently requires external PSK
+authentication; it does not implement certificate verification or ALPN.
+Both client backends share the same response decoder. The source inventory below is historical
 and retains its original repository names and revisions.
 
 ## What is actually Zen
@@ -21,8 +25,11 @@ At HTTP commit `1463e2d` and crypto commit `3c041cd`, physical lines under `src`
 | zen-crypto | 531 | 113 |
 
 These are source inventories, not percentages of runtime work, safety or
-independence from C. Zen currently compiles to C. OpenSSL and libsodium are
-excluded from this table and implement the cryptographic primitives. A Zen
+independence from C. Zen currently compiles to C. OpenSSL and libsodium were
+excluded from this historical table and supplied its cryptographic primitives.
+Current zen-crypto separately implements native Zen primitives and a bounded
+TLS 1.3 PSK/PSK-DHE client plus PSK-DHE server. See its TLS documentation for
+current tests and limits; this old inventory does not describe that work. A Zen
 binding is not a native Zen implementation of encryption or TLS records.
 
 Zen owns HTTP parsing/framing, buffers, scheduling, HPACK/Huffman, HTTP/2 stream
