@@ -18,7 +18,8 @@ for name, target in {
     link.symlink_to(target)
 
 cases = sorted((ROOT / "tests/client-corpus").glob("*.zen"))
-assert len(cases) == 2, "missing migrated HTTP client corpus"
+assert {"http_post", "http2_receiver_protocol"} <= {case.stem for case in cases}, \
+    "missing migrated HTTP client corpus"
 for test in cases:
     entry = SOURCE / test.name
     if entry.is_symlink():
