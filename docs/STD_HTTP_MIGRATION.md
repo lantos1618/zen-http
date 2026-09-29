@@ -1,5 +1,9 @@
 # Moving HTTP callers out of std
 
+The compiler removal is tracked in [Zen PR #12](https://github.com/lantos1618/zen/pull/12).
+The removal statements below describe that revision; older compiler checkouts
+still contain the std APIs.
+
 HTTP/1 and HTTP/2 are package APIs in `zen-http`. The compiler's standard
 library no longer supplies `std.net.http`, `std.net.http2` or `env.net.http()`.
 This is an explicit dependency migration; there is no compatibility facade or

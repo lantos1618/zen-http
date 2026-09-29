@@ -229,3 +229,7 @@ checks over plaintext/TLS, plus request decoder, chunk decoder and state tests.
 
 The benchmark harness retains failed and interrupted runs and refuses to compare
 incomplete cells. See [benchmark validation](docs/BENCHMARK_VALIDATION.md).
+
+The std HTTP removal is tracked in [Zen PR #12](https://github.com/lantos1618/zen/pull/12);
+older compiler checkouts still have those std APIs. The package works with both
+the existing std and the proposed reduced std, as described in the migration guide.

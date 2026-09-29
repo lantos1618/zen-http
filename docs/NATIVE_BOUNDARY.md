@@ -1,5 +1,9 @@
 # Native implementation and standard-library migration
 
+The compiler removal is tracked in [Zen PR #12](https://github.com/lantos1618/zen/pull/12).
+The removal statements below describe that revision; older compiler checkouts
+still contain the std APIs.
+
 The public packages should own one maintained HTTP/TLS protocol implementation.
 The standard library should own generally useful allocation, bytes, sockets,
 clocks and readiness primitives. Publishing a package is not a reason to copy
