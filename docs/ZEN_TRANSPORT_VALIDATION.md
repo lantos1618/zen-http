@@ -62,3 +62,12 @@ SHA-256: `6585a1488c747f512077a121dbfdcc0e513d690798a4da95e106f9b3071e405f`.
 Clang emitted generated-C parentheses warnings; no sanitizer failure was reported.
 This run did not use ASan, prove leak freedom for every failure path, or change
 H2's existing single-active-connection scheduling limitation.
+
+## macOS verification
+
+The same production changes also passed the full suite on macOS arm64 with
+UBSan before publication as `109351f`, using the matching compiler/std checkout
+at `17e51967`. The local log is `build/zen-lifecycle-check.log`, SHA-256
+`aa3021e89e5d5350c201ec26954c188fb5cc1a0dc01ed0ee03e81fc615fca6fc`.
+Initial restricted-sandbox attempts could not open the loopback listener; the
+successful run had loopback socket permission. This is not a macOS ASan result.

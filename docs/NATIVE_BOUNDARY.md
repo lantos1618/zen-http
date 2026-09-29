@@ -51,6 +51,22 @@ uses a platform header for kqueue/epoll layouts and syscall macros.
 Moving OpenSSL setup into `.zen` does not make its cryptography native Zen.
 The separate native PSK path and its security limits remain unchanged.
 
+See [migration validation](ZEN_TRANSPORT_VALIDATION.md) for the macOS/Linux
+integration results, allocation-failure tests and descriptor cleanup checks.
+
+## Implementation rule
+
+Write allocation, cleanup, retry policy, state transitions and protocol logic
+in `.zen`. A handwritten C helper needs a concrete platform ABI or compiler
+limitation, documented beside it. Do not add a C implementation merely to make
+a Zen wrapper shorter. Existing exceptions, particularly the Linux OpenSSL BIO
+and date cache, remain migration work and must be described as such.
+
+The current IPv4 accessors accommodate OS-dependent family-field widths and
+unsupported nested-native-record addresses. OS readiness still bridges native
+kqueue/epoll layouts and macros. Generated C emitted by the Zen compiler is a
+separate build artifact, not a reason to keep handwritten policy in headers.
+
 ## Existing standard-library overlap
 
 `std.net.http`, `std.net.http2` and `std.net.tls` still contain implementations.
