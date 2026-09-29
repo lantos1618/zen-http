@@ -1,297 +1,51 @@
-Ptr, null_ptr, Pool, PoolAlloc, PoolPolicy = std.mem
-Readiness, Interest, WaitResult = std.net.readiness
-str_at = std.text
+// Certificate/plaintext wrapper around the shared HTTP parser and reactor.
 ServerContext, TlsFault = tls
-transport_io, resume_read, transport_requested, transport_armed, transport_mark_armed = http.transport
-ChunkDecoder, ChunkError = http.chunked
-zen_http_listen, zen_http_listener_close, zen_http_accept, zen_http_close, zen_http_listener_fd, zen_http_fd = http.transport
-Native = c.bind("transport.h", {
-    zen_http_seconds = () u64
-    zen_http_date = () Ptr<u8>
-    POLLOUT: i32
-    memmove = (dst: Ptr<u8>, src: Ptr<u8>, len: usize) Ptr<u8>
-})
-ServerError* = Listen | Poll | Invalid
+Ptr, null_ptr = std.mem
+serve_with, TransportBackend = http.server_core
+ServerError*, Request*, Status*, Response*, Handler* = http.server_core
+zen_http_listen, zen_http_listener_close, zen_http_accept, zen_http_close,
+    zen_http_listener_fd, zen_http_fd, transport_io, resume_read,
+    transport_requested, transport_armed, transport_mark_armed = http.transport
 Options* = { host*: str, port*: u16, tls*: bool, certificate*: str, private_key*: str }
-Request* = { method*: str, target*: str, body*: str }
-Status* = Ok | NotFound | BadRequest
-Response* = { status*: Status, body*: str }
-Handler* = { handle* = (self :: @Self, request: Request) Response }
-CAPACITY: usize = 73728
-SLOTS: usize = 256
-// RFC token characters; methods and field names share this grammar.
-token_char = (ch: u8) bool {
-    (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')
-        || (ch >= '0' && ch <= '9') || ch == '!' || ch == '#'
-        || ch == '$' || ch == '%' || ch == '&' || ch == 39
-        || ch == '*' || ch == '+' || ch == '-' || ch == '.'
-        || ch == '^' || ch == '_' || ch == 96 || ch == '|' || ch == '~'
-}
-Connection = {
-    transport :: Ptr<()>,
-    input: Ptr<u8>,
-    output: Ptr<u8>,
-    used :: usize,
-    header :: usize,
-    body :: usize,
-    wire :: usize,
-    chunked :: bool,
-    decoder :: ChunkDecoder,
-    sent :: usize,
-    pending :: usize,
-    closing :: bool,
-    active :: u64,
-    runnable :: bool,
-
-    close = (self :: @Self) {
-        zen_http_close(self.transport);
-        self.transport = null_ptr<()>();
-    }
-
-    parse = (self :: @Self) Res<bool, ServerError> {
-        bytes = str_at(self.input, self.used);
-        end   = bytes.find("\r\n\r\n").match({ Ok(n) => n + 4, None => 0 });
-        (end == 0).then(() {
-            (self.used < 8192).ensure(ServerError.Invalid).try();
-        });
-        (end == 0).match({
-            true  => Ok(false),
-            false => {
-                (end <= 8192).ensure(ServerError.Invalid).try();
-                headers      = bytes.slice(0, end - 2);
-                first        = headers.find("\r\n").ok_or(ServerError.Invalid).try();
-                request_line = headers.slice(0, first);
-                method       = request_line.split_once(' ').ok_or(ServerError.Invalid).try();
-                target       = method.after.split_once(' ').ok_or(ServerError.Invalid).try();
-                (method.before.len > 0 && target.before.starts_with(
-                    "/"
-                ) && target.after == "HTTP/1.1")
-                    .ensure(ServerError.Invalid).try();
-                method.before.loop(
-                    (ch) { token_char(ch).ensure(ServerError.Invalid).try(); }
-                );
-                target.before.loop(
-                    (ch) { (ch > 32 && ch < 127).ensure(
-                        ServerError.Invalid
-                    ).try(); }
-                );
-                has_length   ::= false;
-                has_host     ::= false;
-                has_transfer ::= false;
-                fields       ::= 0;
-                headers.slice(first + 2, headers.len).split('\n').loop((h, raw) {
-                    (raw.len > 0).then(() {
-                        fields = fields + 1;
-                        (fields <= 64).ensure(ServerError.Invalid).try();
-                        (raw.ends_with("\r")).ensure(ServerError.Invalid).try();
-                        line = raw.slice(0, raw.len - 1);
-                        pair = line.split_once(':').ok_or(ServerError.Invalid).try();
-                        (pair.before.len > 0).ensure(ServerError.Invalid).try();
-                        pair.before.loop((ch) {
-                            token_char(ch).ensure(ServerError.Invalid).try();
-                        });
-                        pair.after.loop(
-                            (ch) { (ch == 9 || (ch >= 32 && ch != 127)).ensure(
-                                ServerError.Invalid
-                            ).try(); }
-                        );
-                        value = pair.after.trim().value_or("");
-                        value.loop(
-                            (ch) { (ch == 9 || (ch >= 32 && ch != 127)).ensure(
-                                ServerError.Invalid
-                            ).try(); }
-                        );
-                        pair.before.eq_ignore_case("transfer-encoding").then(() {
-                            (!has_transfer && value.eq_ignore_case("chunked")).ensure(ServerError.Invalid).try();
-                            has_transfer = true;
-                        });
-                        (!pair.before.eq_ignore_case("expect")).ensure(ServerError.Invalid).try();
-                        pair.before.eq_ignore_case("host").then(() {
-                            (!has_host && value.len > 0).ensure(
-                                ServerError.Invalid
-                            ).try();
-                            value.loop((ch) {
-                                (ch > 32 && ch < 127 && ch != ',' && ch != '/'
-                                    && ch != '@' && ch != '#' && ch != '?' && ch != 92)
-                                    .ensure(ServerError.Invalid).try();
-                            });
-                            has_host = true;
-                        });
-                        pair.before.eq_ignore_case("content-length").then(() {
-                            (!has_length && value.len > 0).ensure(
-                                ServerError.Invalid
-                            ).try();
-                            has_length = true;
-                            length ::= 0;
-                            value.loop((ch) {
-                                (ch >= '0' && ch <= '9').ensure(
-                                    ServerError.Invalid
-                                ).try();
-                                (length <= 6553).ensure(
-                                    ServerError.Invalid
-                                ).try();
-                                length = length * 10 + (ch - '0').to_usize();
-                                (length <= 65536).ensure(
-                                    ServerError.Invalid
-                                ).try();
-                            });
-                            self.body = length;
-                        });
-                        pair.before.eq_ignore_case("connection").then(() {
-                            value.split(',').loop((h, token) {
-                                token.trim().value_or("").eq_ignore_case("close").then(() { self.closing = true; });
-                            });
-                        });
-                    });
-                });
-                (has_host).ensure(ServerError.Invalid).try();
-                (!(has_length && has_transfer)).ensure(
-                    ServerError.Invalid
-                ).try();
-                self.chunked = has_transfer;
-                self.decoder = ChunkDecoder.start(end);
-                self.wire    = end + self.body;
-                self.header  = end;
-                Ok(true)
-            },
-        })
-    }
-
-    respond = (self :: @Self, handler :: Handler) Res<(), ServerError> {
-        bytes    = str_at(self.input, self.used);
-        method   = bytes.split_once(' ').ok_or(ServerError.Invalid).try();
-        target   = method.after.split_once(' ').ok_or(ServerError.Invalid).try();
-        response = handler.handle(Request(
-            method: method.before,
-            target: target.before,
-            body: bytes.slice(self.header, self.header + self.body)
-        ));
-        (response.body.len <= 65536).ensure(ServerError.Invalid).try();
-        status = response.status.match({
-            Ok => "HTTP/1.1 200 OK\r\n", NotFound => "HTTP/1.1 404 Not Found\r\n", BadRequest => "HTTP/1.1 400 Bad Request\r\n",
-        });
-        status.copy_into(self.output);
-        prefix: str = "Content-Type: application/octet-stream\r\nContent-Length: ";
-        prefix.copy_into(self.output.offset(status.len));
-        at      ::= status.len + prefix.len;
-        divisor ::= 1;
-        loop(
-            response.body.len / divisor >= 10,
-            (h) { divisor = divisor * 10; }
-        );
-        loop((h) {
-            self.output.write(
-                at,
-                (response.body.len / divisor % 10).to_u8().value_or(0) + '0'
-            );
-            at = at + 1;
-            (divisor == 1).then(() { h.break(); });
-            divisor = divisor / 10;
-        });
-        date_prefix: str = "\r\nDate: ";
-        date_prefix.copy_into(self.output.offset(at));
-        at = at + date_prefix.len;
-        self.output.offset(at).copy_from(Native.zen_http_date(), 29);
-        at     = at + 29;
-        suffix = self.closing.match({ true => "\r\nConnection: close\r\n\r\n", false => "\r\n\r\n" });
-        suffix.copy_into(self.output.offset(at));
-        at = at + suffix.len;
-        response.body.copy_into(self.output.offset(at));
-        self.pending = at + response.body.len;
-        self.sent    = 0;
-        Ok(())
-    }
-
-    // Each round permits at most eight responses and 64 state transitions.
-    // A budget yield remains locally runnable: buffered input and TLS records
-    // do not necessarily produce another kernel readiness notification.
-    drive = (self :: @Self, handler :: Handler) Res<bool, ServerError> {
-        steps     ::= 0;
-        completed ::= 0;
-        yielded   ::= false;
-        loop((h) {
-            (steps >= 64 || completed >= 8).then(() {
-                yielded = true; h.break();
-            });
-            steps = steps + 1;
-            (self.pending > 0).match({
-                true  => {
-                    n = transport_io(
-                        self.transport,
-                        self.output.offset(self.sent),
-                        self.pending - self.sent,
-                        1
-                    );
-                    (n == -2).then(() { h.break(); });
-                    (n > 0).ensure(ServerError.Invalid).try();
-                    self.sent   = self.sent + n.to_usize().ok_or(
-                        ServerError.Invalid
-                    ).try();
-                    self.active = Native.zen_http_seconds();
-                    (self.sent == self.pending).then(() {
-                        (!self.closing).ensure(ServerError.Invalid).try();
-                        consumed  = self.wire;
-                        self.used = self.used - consumed;
-                        Native.memmove(
-                            self.input,
-                            self.input.offset(consumed),
-                            self.used
-                        );
-                        self.header = 0; self.body = 0; self.pending = 0;
-                        completed = completed + 1;
-                        (self.used == 0 && resume_read(self.transport) == 0).then(() { h.break(); });
-                    });
-                },
-                false => {
-                    (self.header == 0).then(() { self.parse().try(); });
-                    ready ::= false;
-                    (self.header > 0).then(() {
-                        self.chunked.match({
-                            true  => {
-                                ready     = self.decoder.advance(
-                                    self.input,
-                                    self.used,
-                                    self.header
-                                ).try(ServerError.Invalid);
-                                self.body = self.decoder.decoded;
-                                self.wire = self.decoder.cursor;
-                            },
-                            false => { ready = self.used >= self.wire; },
-                        });
-                    });
-                    ready.match({
-                        true  => self.respond(handler).try(),
-                        false => {
-                            (self.used < CAPACITY).ensure(
-                                ServerError.Invalid
-                            ).try();
-                            n = transport_io(
-                                self.transport,
-                                self.input.offset(self.used),
-                                CAPACITY - self.used,
-                                0
-                            );
-                            (n == -2).then(() { h.break(); });
-                            (n > 0).ensure(ServerError.Invalid).try();
-                            self.used   = self.used + n.to_usize().ok_or(
-                                ServerError.Invalid
-                            ).try();
-                            self.active = Native.zen_http_seconds();
-                        },
-                    });
-                },
-            });
-        });
-        Ok(yielded)
-    }
-}
-// Request views are borrowed only for the synchronous handler call. Response
-// bytes are copied before that call's input buffer is reused. No per-request allocation.
+OpenSslBackend = { context: Ptr<()> }
+OpenSslBackend.impl(TransportBackend, {
+    listen = (self :: @Self, a: Alloc, host: Ptr<u8>, port: u16) Ptr<()> { zen_http_listen(
+        a,
+        host,
+        port,
+        self.context
+    ) }
+    listener_close = (self :: @Self, handle: Ptr<()>) { zen_http_listener_close(
+        handle
+    ) }
+    accept = (self :: @Self, listener: Ptr<()>) Ptr<()> { zen_http_accept(
+        listener
+    ) }
+    close = (self :: @Self, handle: Ptr<()>) { zen_http_close(handle) }
+    listener_fd = (self :: @Self, listener: Ptr<()>) i32 { zen_http_listener_fd(
+        listener
+    ) }
+    fd = (self :: @Self, handle: Ptr<()>) i32 { zen_http_fd(handle) }
+    io = (self :: @Self, handle: Ptr<()>, bytes: Ptr<u8>, len: usize, writing: i32) i64 { transport_io(
+        handle,
+        bytes,
+        len,
+        writing
+    ) }
+    finish = (self :: @Self, handle: Ptr<()>) i64 { 1 }
+    resume_read = (self :: @Self, handle: Ptr<()>) i32 { resume_read(handle) }
+    requested = (self :: @Self, handle: Ptr<()>) i32 { transport_requested(
+        handle
+    ) }
+    armed = (self :: @Self, handle: Ptr<()>) i32 { transport_armed(handle) }
+    mark_armed = (self :: @Self, handle: Ptr<()>, interest: i32) { transport_mark_armed(
+        handle,
+        interest
+    ) }
+})
 serve* = (a: Alloc, options: Options, handler :: Handler) Res<(), AllocError
     | ServerError> {
-    (!options.host.contains(0) && !options.certificate.contains(0) && !options.private_key.contains(0))
-        .ensure(ServerError.Listen).try();
-    host    = options.host.c_text(a).try();
+    (!options.host.contains(0) && !options.certificate.contains(0) && !options.private_key.contains(0)).ensure(ServerError.Listen).try();
     context = options.tls.match({
         true  => ServerContext.create(
             a,
@@ -300,160 +54,6 @@ serve* = (a: Alloc, options: Options, handler :: Handler) Res<(), AllocError
         ).try(ServerError.Listen),
         false => ServerContext(handle: null_ptr<()>()),
     });
-    // The caller's allocator may be an arena with no individual free. Reuse
-    // transport storage across connection churn, with an explicit cache bound.
-    transport_pool = a.realloc<Pool>(null_ptr<Pool>(), 1).try();
-    transport_pool.write(0, Pool());
-    @scope.defer(() {
-        pool ::= transport_pool.read(0);
-        pool.close();
-        a.free(transport_pool);
-    });
-    transport_alloc = PoolAlloc(
-        pool: transport_pool,
-        policy: PoolPolicy(cache_bytes: 65536, block_bytes: 1024, blocks: 512)
-    );
-    listener        = zen_http_listen(
-        transport_alloc,
-        host.ptr(),
-        options.port,
-        context.handle
-    );
-    (!listener.is_null()).ensure(ServerError.Listen).try();
-    @scope.defer(() { zen_http_listener_close(listener); });
-    connections = a.realloc<Connection>(null_ptr<Connection>(), SLOTS).try();
-    Range(0, SLOTS).loop((i) {
-        connections.write(
-            i,
-            Connection(
-                transport: null_ptr<()>(),
-                input: a.realloc<u8>(null_ptr<u8>(), CAPACITY).try(),
-                output: a.realloc<u8>(null_ptr<u8>(), CAPACITY).try(),
-                used: 0,
-                header: 0,
-                body: 0,
-                wire: 0,
-                chunked: false,
-                decoder: ChunkDecoder.start(0),
-                sent: 0,
-                pending: 0,
-                closing: false,
-                active: 0,
-                runnable: false
-            )
-        );
-    });
-    @scope.defer(() {
-        Range(0, SLOTS).loop((i) {
-            c ::= connections.read(i);
-            (!c.transport.is_null()).then(() { c.close(); });
-        });
-    });
-    reactor ::= Readiness.open(a, SLOTS + 1).try(ServerError.Poll);
-    reactor.add(
-        zen_http_listener_fd(listener),
-        SLOTS,
-        Interest.Read
-    ).try(ServerError.Poll);
-    swept    ::= Native.zen_http_seconds();
-    runnable ::= false;
-    loop((h) {
-        timeout: i32 = runnable.match({true => 0, false => 1000});
-        // An interrupted wait returns to the scheduling/expiry loop without
-        // restarting its full timeout. This is HTTP policy, not std policy.
-        count = reactor.wait(timeout).try(ServerError.Poll).match({
-            Ready(n) => n, Interrupted => 0,
-        });
-        Range(0, count).loop((event) {
-            slot = reactor.ready_slot(event).try(ServerError.Poll);
-            (slot == SLOTS).match({
-                true  => {
-                    full     ::= true;
-                    accepted ::= 0;
-                    Range(0, SLOTS).loop((accept_loop, i) {
-                        (accepted >= 16).then(() { accept_loop.break(0); });
-                        c ::= connections.read(i);
-                        c.transport.is_null().then(() {
-                            full      = false;
-                            transport = zen_http_accept(listener);
-                            transport.is_null().then(
-                                () { accept_loop.break(0); }
-                            );
-                            c.transport = transport;
-                            c.used      = 0; c.header = 0; c.body = 0; c.pending = 0; c.sent = 0;
-                            c.closing = false; c.active = Native.zen_http_seconds();
-                            c.runnable = false; accepted = accepted + 1;
-                            want     = transport_requested(transport);
-                            interest = (want == Native.POLLOUT).match({true => Interest.Write, false => Interest.Read});
-                            reactor.add(
-                                zen_http_fd(transport),
-                                i,
-                                interest
-                            ).match({
-                                Ok(_)  => transport_mark_armed(transport, want),
-                                Err(_) => c.close(),
-                            });
-                            connections.write(i, c);
-                        });
-                    });
-                    // Refuse overload instead of spinning on a readable listener.
-                    full.then(() {
-                        refused = zen_http_accept(listener);
-                        (!refused.is_null()).then(
-                            () { zen_http_close(refused); }
-                        );
-                    });
-                },
-                false => {
-                    (slot < SLOTS).ensure(ServerError.Poll).try();
-                    c ::= connections.read(slot);
-                    (!c.transport.is_null()).then(() {
-                        c.runnable = true;
-                        connections.write(slot, c);
-                    });
-                },
-            });
-        });
-        // Coalesce duplicate readiness events, then visit each runnable slot once.
-        runnable = false;
-        Range(0, SLOTS).loop((slot) {
-            c ::= connections.read(slot);
-            (!c.transport.is_null() && c.runnable).then(() {
-                c.runnable = false;
-                c.drive(handler).match({
-                    Ok(again) => { c.runnable = again; },
-                    Err(_)    => c.close(),
-                });
-                (!c.transport.is_null()).then(() {
-                    want = transport_requested(c.transport);
-                    (want != transport_armed(c.transport)).then(() {
-                        interest = (want == Native.POLLOUT).match({true => Interest.Write, false => Interest.Read});
-                        reactor.modify(
-                            zen_http_fd(c.transport),
-                            slot,
-                            interest
-                        ).match({
-                            Ok(_)  => transport_mark_armed(c.transport, want),
-                            Err(_) => c.close(),
-                        });
-                    });
-                    (!c.transport.is_null() && c.runnable).then(
-                        () { runnable = true; }
-                    );
-                });
-                connections.write(slot, c);
-            });
-        });
-        now = Native.zen_http_seconds();
-        (now != swept).then(() {
-            swept = now;
-            Range(0, SLOTS).loop((i) {
-                c ::= connections.read(i);
-                (!c.transport.is_null() && now - c.active >= 10).then(() {
-                    c.close(); connections.write(i, c);
-                });
-            });
-        });
-    });
-    Ok(())
+    backend ::= OpenSslBackend(context: context.handle);
+    serve_with(a, options.host, options.port, backend, handler)
 }

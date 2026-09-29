@@ -53,7 +53,10 @@ protections must survive a future conversion. Generic std readiness still
 uses a platform header for kqueue/epoll layouts and syscall macros.
 
 Moving OpenSSL setup into `.zen` does not make its cryptography native Zen.
-The separate native PSK path and its security limits remain unchanged.
+The explicit native PSK HTTP/1 server now uses resumable Zen handshakes and
+records through the shared HTTP reactor. It does not provide certificate or
+hostname authentication. [Backend details](NATIVE_TLS_REACTOR.md) distinguish
+that target from the default OpenSSL server.
 
 See [migration validation](ZEN_TRANSPORT_VALIDATION.md) for the macOS/Linux
 integration results, allocation-failure tests and descriptor cleanup checks.

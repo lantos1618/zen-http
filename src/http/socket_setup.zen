@@ -1,0 +1,127 @@
+// Shared nonblocking POSIX socket setup; no TLS implementation dependency.
+Alloc, Ptr, null_ptr = std.mem
+
+SockAddr = c.record("transport.h", "struct sockaddr_in", {
+    sin_port: u16,
+})
+Setup = c.bind("transport.h", {
+    AF_INET: i32
+    SOCK_STREAM: i32
+    SOL_SOCKET: i32
+    SO_REUSEADDR: i32
+    SO_NOSIGPIPE: i32 = 0
+    IPPROTO_TCP: i32
+    TCP_NODELAY: i32
+    F_GETFL: i32
+    F_SETFL: i32
+    F_GETFD: i32
+    F_SETFD: i32
+    O_NONBLOCK: i32
+    FD_CLOEXEC: i32
+    socket = (family: i32, kind: i32, protocol: i32) i32
+    accept = (fd: i32, address: Ptr<()>, count: Ptr<u32>) i32
+    close = (fd: i32) i32
+    fcntl = (fd: i32, command: i32, flags: i32) i32
+    setsockopt = (fd: i32, level: i32, option: i32, value: Ptr<()>, count: u32) i32
+    inet_pton = (family: i32, host: Ptr<c_char>, address: Ptr<()>) i32
+    zen_http_ipv4_family = (address: Ptr<()>, family: i32) ()
+    zen_http_ipv4_address = (address: Ptr<()>) Ptr<()>
+    htons = (port: u16) u16
+    bind = (fd: i32, address: Ptr<()>, count: usize) i32
+    listen = (fd: i32, backlog: i32) i32
+})
+
+SetupError = Allocation | Socket
+
+with_flag = (flags: i32, bit: i32) i32 {
+    ((flags / bit) % 2 == 0).match({true => flags + bit, false => flags})
+}
+configure = (a: Alloc, fd: i32) Res<(), SetupError> {
+    option = a.raw(4, 4).try(SetupError.Allocation).to<i32>();
+    @scope.defer(() { a.free(option); });
+    option.write(0, 1);
+    flags = Setup.fcntl(fd, Setup.F_GETFL, 0);
+    bits  = Setup.fcntl(fd, Setup.F_GETFD, 0);
+    (flags >= 0 && bits >= 0).ensure(SetupError.Socket).try();
+    (Setup.fcntl(fd, Setup.F_SETFL, with_flag(flags, Setup.O_NONBLOCK)) == 0
+        && Setup.fcntl(
+            fd,
+            Setup.F_SETFD,
+            with_flag(bits, Setup.FD_CLOEXEC)
+        ) == 0)
+        .ensure(SetupError.Socket).try();
+    (Setup.SO_NOSIGPIPE != 0).then(() {
+        (Setup.setsockopt(
+            fd,
+            Setup.SOL_SOCKET,
+            Setup.SO_NOSIGPIPE,
+            option.to<()>(),
+            4
+        ) == 0)
+            .ensure(SetupError.Socket).try();
+    });
+    (Setup.setsockopt(
+        fd,
+        Setup.IPPROTO_TCP,
+        Setup.TCP_NODELAY,
+        option.to<()>(),
+        4
+    ) == 0)
+        .ensure(SetupError.Socket)
+}
+listen_address = (
+    a    : Alloc,
+    fd   : i32,
+    host : Ptr<u8>,
+    port : u16
+) Res<(), SetupError> {
+    address = a.raw(
+        null_ptr<SockAddr>().bytes(1),
+        16
+    ).try(SetupError.Allocation).to<SockAddr>();
+    @scope.defer(() { a.free(address); });
+    address.write(0, SockAddr(sin_port: Setup.htons(port)));
+    Setup.zen_http_ipv4_family(address.to<()>(), Setup.AF_INET);
+    (Setup.inet_pton(
+        Setup.AF_INET,
+        host.to<c_char>(),
+        Setup.zen_http_ipv4_address(address.to<()>())
+    ) == 1)
+        .ensure(SetupError.Socket).try();
+    option = a.raw(4, 4).try(SetupError.Allocation).to<i32>();
+    @scope.defer(() { a.free(option); });
+    option.write(0, 1);
+    (Setup.setsockopt(
+        fd,
+        Setup.SOL_SOCKET,
+        Setup.SO_REUSEADDR,
+        option.to<()>(),
+        4
+    ) == 0)
+        .ensure(SetupError.Socket).try();
+    configure(a, fd).try();
+    size = address.bytes(1);
+    (Setup.bind(fd, address.to<()>(), size) == 0 && Setup.listen(fd, 256) == 0)
+        .ensure(SetupError.Socket)
+}
+socket_listen* = (a: Alloc, host: Ptr<u8>, port: u16) i32 {
+    fd = Setup.socket(Setup.AF_INET, Setup.SOCK_STREAM, 0);
+    (fd < 0).match({
+        true  => -1,
+        false => listen_address(a, fd, host, port).match({
+            Ok(_)  => fd,
+            Err(_) => { Setup.close(fd); -1 },
+        }),
+    })
+}
+socket_accept* = (a: Alloc, listener: i32) i32 {
+    fd = Setup.accept(listener, null_ptr<()>(), null_ptr<u32>());
+    (fd < 0).match({
+        true  => -1,
+        false => configure(a, fd).match({
+            Ok(_)  => fd,
+            Err(_) => { Setup.close(fd); -1 },
+        }),
+    })
+}
+socket_close* = (fd: i32) { Setup.close(fd); }

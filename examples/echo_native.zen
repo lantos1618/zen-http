@@ -1,0 +1,48 @@
+// Loopback test example: echo-native TEST_PSK_HEX PORT. argv is visible to other
+// local processes; never put production secrets here. Identity is "ZenTest".
+serve_psk, PskOptions, Handler, Request, Response, Status, ServerError = http.native_server
+Echo = {}
+Echo.impl(Handler, {
+    handle = (self :: @Self, request: Request) Response {
+        (request.method == "POST" && request.target == "/echo").match({
+            true  => Response(status: Status.Ok, body: request.body),
+            false => Response(status: Status.NotFound, body: "not found"),
+        })
+    }
+})
+nibble = (v: u8) Res<u8, ServerError> {
+    (v >= 48 && v <= 57).match({
+        true  => Ok(v - 48),
+        false => { (v >= 97 && v <= 102).ensure(ServerError.Invalid).try(); Ok(v - 87) },
+    })
+}
+main = (env: Env) Res<(), AllocError | ServerError> {
+    hex       = env.argv.get(1).ok_or(ServerError.Invalid).try();
+    port_text = env.argv.get(2).ok_or(ServerError.Invalid).try();
+    (hex.len == 64 && port_text.len > 0 && port_text.len <= 5).ensure(
+        ServerError.Invalid
+    ).try();
+    port: u64 ::= 0;
+    Range(0, port_text.len).loop((i) {
+        ch = port_text.ptr().read(i); (ch >= 48 && ch <= 57).ensure(ServerError.Invalid).try();
+        port = port * 10 + (ch - 48).to_u64();
+    });
+    (port > 0 && port <= 65535).ensure(ServerError.Invalid).try();
+    a = env.mem.alloc(); key = a.raw(32, 8).try();
+    @scope.defer(
+        () { Range(0, 32).loop((i) { key.write(i, 0); }); a.free(key); }
+    );
+    Range(0, 32).loop((i) { key.write(i, nibble(hex.ptr().read(i * 2)).try() * 16 + nibble(hex.ptr().read(i * 2 + 1)).try()); });
+    echo ::= Echo();
+    serve_psk(
+        a,
+        PskOptions(
+            host: "127.0.0.1",
+            port: port.to_u16().ok_or(ServerError.Invalid).try(),
+            identity: "ZenTest",
+            psk: key,
+            psk_count: 32
+        ),
+        echo
+    )
+}

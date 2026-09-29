@@ -1,144 +1,94 @@
-# Native TLS integration with the HTTP reactor
+# Native PSK HTTPS reactor
 
-This is a staged migration, not an implemented server backend. Native Zen
-TLS supports blocking external-PSK handshakes, including X25519 PSK-DHE
-client/server roles. Established sessions now expose resumable application
-record progress as well as the existing blocking driver. The HTTP reactor
-still uses the zen-openssl transport. The native HTTP client adapter consumes
-an already authenticated blocking session.
+The explicit `http.native_server.serve_psk` entry point serves HTTP/1.1 over
+native Zen TLS 1.3 external-PSK/X25519 sessions. It shares HTTP parsing,
+framing, response generation, scheduling and readiness with the existing
+OpenSSL/plaintext server. It does not authenticate web certificates and is
+not browser-compatible HTTPS. The default certificate-backed server and
+HTTP/2 still use `zen-openssl`.
 
-## Current boundary
+## Build and run
 
-- `src/http/transport.zen` owns nonblocking socket setup and the Zen
-  listener/connection records. They still carry opaque OpenSSL session/context
-  handles; `src/transport.h` no longer contains SSL layouts or includes.
-- `src/http/transport.zen` maps OpenSSL progress to bytes, read/write interest,
-  and closure. It also handles raw socket errno and buffered TLS input.
-- `src/http/server.zen` limits each drive round to 64 transitions/eight responses
-  and uses std readiness plus a local runnable queue. Connection descriptors
-  are copied between slot storage and local variables.
-- In zen-crypto, handshake functions still perform blocking I/O. The session
-  now retains partial ciphertext input and pending output through `feed`,
-  `queue_record`, `pending_output`, `acknowledge`, and `read_plaintext`. Its
-  blocking driver uses that same record engine. `SocketFd` still maps syscall
-  failures to socket faults; calling the blocking driver on a nonblocking
-  descriptor treats EAGAIN as terminal. No reactor socket adapter exists yet.
+Use matching compiler/std sources with `std.entropy`, `std.net.readiness` and
+`std.mem.PoolAlloc`, plus sibling `zen-crypto` sources containing
+`Tls13ServerHandshake`. The explicit script stages these dependencies without
+downloading anything:
 
-Calling the blocking native accept/read/write APIs from this reactor would
-therefore block other connections or abort on ordinary nonblocking backpressure.
-Wrapping those calls in an actor does not solve the transport contract.
+```sh
+export ZEN_COMPILER=/path/to/zen/zen
+export ZEN_STD=/path/to/zen/src
+export ZEN_CRYPTO=/path/to/zen-crypto
+sh scripts/build-native.sh
+# Loopback demonstration only; argv exposes the test PSK to local inspection.
+./build/zen-native-server TEST_PSK_HEX PORT
+```
 
-## Shared protocol engine
+The example uses identity `ZenTest` and expects a 32-byte hexadecimal test PSK.
+Applications instead import `serve_psk`, `PskOptions` and `Handler` from
+`http.native_server`, supply their own secret storage and allocator, and keep
+the PSK and identity immutable for the entire serve call. Public handshake
+random and ephemeral private-key bytes come from two independent OS entropy
+requests per accepted connection. There is no insecure entropy fallback.
 
-Continue extracting one resumable protocol engine in zen-crypto, then make both
-blocking and reactor adapters drive it. Application records now share such an
-engine; the handshake remains to be converted. Do not create an HTTP-specific copy of TLS
-parsing, transcript handling, key derivation, or record protection.
+The native build needs no OpenSSL/libsodium headers or link libraries. It uses
+Zen's generated C backend and the existing POSIX ABI helpers. It builds with
+UBSan by default; `SANITIZERS=address,undefined` enables both sanitizers.
+This is a validation target, not a benchmark build.
 
-The engine needs persistent handshake phase, partial header/body offsets,
-handshake-message accumulation, directional sequences, authenticated plaintext
-remaining to deliver, and ciphertext remaining to write. Its proposed boundary
-accepts bounded ciphertext input, exposes bounded pending output, acknowledges
-bytes written, and reports progress such as `NeedInput`, `NeedOutput`,
-`Runnable`, `Established`, or a terminal error. These names describe a proposed
-unified handshake boundary; there is no resumable handshake API yet. Buffer
-ownership and view lifetimes must be explicit.
+## Ownership and progress
 
-A record is sealed once and retained across partial writes. Retries must never
-re-encrypt plaintext or consume another sequence number. Authentication and
-inner-record validation precede plaintext release. EOF before close_notify
-remains truncation; authenticated shutdown and all fatal cleanup remain shared
-protocol behavior. Existing blocking APIs become compatibility drivers for this
-engine and retain their observable contracts.
+`server_core.zen` contains the common parser/reactor and its transport contract.
+`server.zen` supplies the existing certificate/plaintext wrapper;
+`native_server.zen` supplies explicit PSK configuration. `socket_setup.zen`
+shares nonblocking/CLOEXEC/socket-option setup between backends.
 
-Each progress call must bound protocol work. Local buffered work must report a
-runnable yield, rather than pretending it needs another socket event. The current
-HTTP `-2` wait result alone cannot express this distinction. Existing handshake,
-message-size, empty-record and parser limits must survive the refactor.
+`native_transport.zen` owns stable handshake/session storage. Connection slots
+copy only borrowed handles. The handshake receives one bounded fragment or
+advances one protocol phase at a time; server flights remain unchanged until
+acknowledged. Finished authentication precedes the one-time allocation handoff
+into `Tls13Session`. Handshake and established-record buffers overlap, so they
+are never used as two live engines over the same memory. Unconsumed socket input
+survives the handoff and may contain the first HTTP application record.
 
-## Migration and verification gates
+The adapter returns positive plaintext progress, `-2` for kernel readiness,
+`-3` for local runnable work, and `-1` for terminal closure/error. EAGAIN keeps
+ciphertext queued; EINTR yields locally. An HTTP write is acknowledged only
+after its sealed record is fully written. Both HTTP-requested shutdown and
+peer-initiated close_notify flush the native response alert across partial
+writes before closing the descriptor. Raw EOF is truncation, not authenticated
+TLS closure. Abort and timeout release owners and descriptors once.
 
-1. **Record progress is implemented in zen-crypto.** Established sessions
-   retain partial header/body input and sealed output until acknowledged. The
-   blocking session uses these same transitions. Byte-fed tests cover partial
-   and zero-progress retries, independent ciphertext agreement, duplex storage,
-   malformed input, closure and exactly-once cleanup. These simulate transport
-   progress; they do not exercise actual OS EAGAIN/EINTR. The eventual socket
-   adapter must add those tests and preserve queued ciphertext across them.
-   See [the session contract](https://github.com/lantos1618/zen-crypto/blob/main/docs/TLS13.md#resumable-application-records).
+The shared reactor admits at most 256 connections, accepts at most 16 per
+listener turn, and bounds each connection drive to 64 transitions/eight
+responses. Ten seconds without HTTP plaintext progress expires an incomplete
+handshake or idle/blocked connection. X25519 remains synchronous CPU work;
+these bounds are not a real-time latency guarantee. Existing HTTP framing,
+body/header limits and handler lifetimes are unchanged.
 
-2. **Make the handshake resumable.** Persist ClientHello/ServerHello, transcript,
-   flight and Finished phases instead of retaining execution inside socket
-   loops. Preserve binder verification and peer-Finished authentication barriers.
-   Gate: existing independent peers, OpenSSL and native-to-native tests pass
-   through both drivers, including fragmented handshakes and rejected clients.
-   Bound admitted handshakes and scheduler work; X25519 remains CPU work even
-   after socket blocking is removed.
+Each TLS owner requests 180000 + 32768 bytes, plus an 18437-byte transport input
+buffer and ownership metadata. The reactor separately reserves 36 MiB for
+HTTP buffers. A bounded std pool reuses small transport allocations and frees
+large connection allocations on teardown; no tiny memory-footprint claim is
+made.
 
-3. **Separate transport backend selection.** Socket setup and handle allocation
-   have moved to Zen, preserving nonblocking mode, close-on-exec and SIGPIPE
-   protection. Select native versus OpenSSL session state explicitly rather
-   than treating the current opaque handles as interchangeable.
-   Store each owning TLS engine at a stable location; HTTP slot copies should
-   carry borrowed handles, not duplicate a Drop-owning session. Gate: allocation
-   failure, connection timeout, abort and repeated cleanup release resources
-   once, without closing unrelated descriptors.
+## Checks and remaining scope
 
-4. **Wire an explicit native PSK HTTP/1 target.** Let the HTTP adapter translate
-   raw nonblocking I/O and engine progress into readiness/runnable decisions.
-   Reuse the HTTP parser, handlers, fairness budgets and std readiness. Keep PSK
-   configuration distinct from certificate/private-key options. Gate: real
-   listener tests show one stalled handshake or blocked writer cannot stop
-   other connections; buffered progress cannot stall awaiting a nonexistent
-   kernel event. Run HTTP framing, pipelining and shutdown regressions on macOS
-   and Linux, plus sanitizer checks and a deliberate stalled-progress control.
-   Inspect the final executable/link inputs for absence of OpenSSL and libsodium.
+```sh
+PYTHON=/path/to/python-with-cryptography \
+OPENSSL=/path/to/reference/openssl sh scripts/check-native.sh
+```
 
-## Next extraction: server handshake
+OpenSSL and Python cryptography are independent test peers only. Checks cover
+fragmented and coalesced handshakes, handshake/application handoff, HTTP
+pipelining/chunked framing, large echoes, stalled handshake and slow-reader
+isolation, authentication rejection, timeout, reciprocal close_notify and
+repeated cleanup. An intentionally broken local-runnable scheduler must stall
+the test. Allocation/entropy failures and injected EINTR have dedicated adapter
+checks; an injected errno is not an actual signal-delivery test. Separate
+crypto tests check exact independent flights and reject a Finished-verification
+bypass. Existing OpenSSL/plaintext/HTTP2 regression suites still apply.
 
-The smallest server integration step is to make `tls13_psk_dhe_accept` a
-blocking driver over a resumable server handshake. Reuse its existing
-ClientHello parser, binder verification and key-schedule functions. Retain
-phases for receiving ClientHello, preparing and sending ServerHello, sending
-the encrypted flight, receiving client Finished, and establishing the session.
-Partial output acknowledgements must never rebuild or reseal either flight.
-Preserve the existing record-count, CCS-count and handshake-size limits.
-
-The handshake workspace at `34000..99536` overlaps the established record
-engine's input buffers. Do not call `Tls13Session.feed` during the handshake.
-Keep the current handshake layout until authentication completes, retain
-unconsumed input at the adapter, and stop consuming input while a flight is
-pending. Transfer the allocations into the established session exactly once,
-after client Finished is verified and the server flight has been acknowledged.
-The resumable API must define PSK/identity lifetimes beyond a single call and
-release allocations on cancellation or any terminal error.
-
-Gate this extraction with fragmented ClientHello/Finished, bytewise record
-headers, short and zero output acknowledgements, EOF at every phase, malformed
-CCS, replay, and failed ownership handoff. Re-run independent Python, OpenSSL
-and native-pair checks. Only subsequent real reactor tests can establish that
-one stalled handshake does not block another connection; X25519 still requires
-bounded admission and scheduling even after socket waits become resumable.
-
-## Scope and remaining limits
-
-The initial target is HTTP/1 over configured external PSKs with X25519. It does
-not provide certificate chains, hostname validation, general browser HTTPS,
-HRR, session tickets or KeyUpdate. Native ALPN is absent, so this migration must
-not claim HTTP/2 negotiation. The existing HTTP/2 and OpenSSL paths remain
-separate until their required contracts are implemented and tested.
-
-Current TLS storage requests total 212768 bytes per active session, before HTTP
-buffers and metadata: about 52 MiB for 256 sessions. The initial migration should
-make allocation/admission limits explicit; shrinking handshake storage is a
-separate optimization. Passing
-interoperability and sanitizer tests is not a security audit, secure-erasure
-proof, or evidence of beating uWebSockets. Performance comparisons follow only
-after equivalent behavior and fair workloads are established.
-
-The record-engine milestone is published in zen-crypto `81189a6`. Existing
-native HTTP regressions pass through its shared blocking driver on macOS
-(UBSan) and Linux (ASan and UBSan): 207 parser split cases, eight parser
-rejections and eight encrypted exchange cases. The runner now treats generated
-comparison-parenthesis warnings as errors. [Validation details](https://github.com/lantos1618/zen-crypto/blob/main/tests/validation/tls13-record-progress-2026-09-29.txt)
-record the exact compiler, source revision and limits.
+Still missing: resumable native client handshakes, certificate/hostname/trust
+validation, native ALPN/HTTP2 negotiation, HRR, tickets, KeyUpdate and graceful
+whole-server shutdown. No security audit, portable constant-time guarantee,
+compiler-resistant erasure or uWebSockets speed advantage is claimed.

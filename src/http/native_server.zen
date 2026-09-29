@@ -1,0 +1,18 @@
+// Experimental external-PSK HTTPS. No certificates or hostname authentication.
+// The PSK and identity are borrowed for the entire serve call. Caller owns secrets.
+serve_with, TransportBackend = http.server_core
+ServerError*, Request*, Status*, Response*, Handler* = http.server_core
+NativeBackend = http.native_transport
+PskOptions* = { host*: str, port*: u16, identity*: str, psk*: Ptr<u8>, psk_count*: usize }
+serve_psk* = (a: Alloc, options: PskOptions, handler :: Handler) Res<(), AllocError
+    | ServerError> {
+    (options.identity.len > 0 && options.identity.len <= 255 && !options.psk.is_null() && options.psk_count > 0).ensure(
+        ServerError.Invalid
+    ).try();
+    backend ::= NativeBackend(
+        identity: options.identity,
+        psk: options.psk,
+        psk_count: options.psk_count
+    );
+    serve_with(a, options.host, options.port, backend, handler)
+}

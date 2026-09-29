@@ -1,0 +1,367 @@
+// External-PSK TLS 1.3 reactor adapter. No certificate authentication or
+// OpenSSL dependency. Handles have one owner; the reactor owns deadlines and
+// cancels by close. Config storage must remain immutable through handshakes.
+// Retry a pending write with unchanged input address/count until it reports
+// positive consumption. Each io call performs bounded work; -3 means reschedule
+// locally, -2 means wait for requested kernel readiness. No busy retry loop.
+Alloc, AllocError, Ptr, null_ptr = std.mem
+SocketFd = std.net.socket
+fill_random = std.entropy
+Tls13ServerHandshake, Tls13ServerProgress = tls13_server
+Tls13Session, Tls13Read, Tls13Output, Tls13ClientError = tls13_session
+TransportBackend = http.server_core
+socket_listen, socket_accept, socket_close = http.socket_setup
+
+Native = c.bind("transport.h", {
+    POLLIN: i32
+    POLLOUT: i32
+    EAGAIN: i32
+    EWOULDBLOCK: i32
+    EINTR: i32
+    MSG_NOSIGNAL: i32 = 0
+    zen_http_errno = () i32
+    send = (fd: i32, bytes: Ptr<u8>, count: usize, flags: i32) i64
+    recv = (fd: i32, bytes: Ptr<u8>, count: usize, flags: i32) i64
+})
+Listener = { alloc: Alloc, fd: i32 }
+INPUT: usize = 18437
+Handle = {
+    alloc: Alloc, fd: i32,
+    handshake: Ptr<Tls13ServerHandshake>, session: Ptr<Tls13Session>, input: Ptr<u8>,
+    established :: bool, used :: usize, consumed :: usize,
+    pending_plain :: usize, want :: i32, armed :: i32, closing :: bool, peer_closed :: bool,
+
+    receive = (self :: @Self) i64 {
+        (self.consumed < self.used).match({
+            true  => 1,
+            false => {
+                self.want = Native.POLLIN;
+                n         = Native.recv(self.fd, self.input, INPUT, 0);
+                (n > 0).match({
+                    true  => { self.used = n.to_usize().value_or(
+                        0
+                    ); self.consumed = 0; 1 },
+                    false => { (n == 0).then(() { self.eof(); }); retry(n) },
+                })
+            },
+        })
+    }
+    eof = (self: @Self) {
+        self.established.match({
+            true  => {
+                owner ::= self.session.read(0); owner.feed_eof();
+                self.session.write(0, consume owner);
+            },
+            false => {
+                owner ::= self.handshake.read(0); owner.feed_eof();
+                self.handshake.write(0, consume owner);
+            },
+        });
+    }
+    peer_shutdown = (self :: @Self) i64 {
+        n = self.finish(); (n == 1).match({true => -1, false => n})
+    }
+    // At most one OS send. Ciphertext storage remains stable across EAGAIN.
+    flush = (self :: @Self) i64 {
+        pending = self.output();
+        (pending.count == 0).match({
+            true  => 1,
+            false => {
+                self.want = Native.POLLOUT;
+                n         = Native.send(
+                    self.fd,
+                    pending.data,
+                    pending.count,
+                    Native.MSG_NOSIGNAL
+                );
+                (n > 0).match({
+                    true  => {
+                        self.ack(n.to_usize().value_or(0)).match({
+                            Err(_) => -1,
+                            Ok(_)  => (self.output().count == 0).match({true => 1, false => -3}),
+                        })
+                    },
+                    false => retry(n),
+                })
+            },
+        })
+    }
+    output = (self: @Self) Tls13Output {
+        self.established.match({
+            true  => {
+                owner ::= self.session.read(0); value = owner.pending_output();
+                self.session.write(0, consume owner); value
+            },
+            false => {
+                owner ::= self.handshake.read(
+                    0
+                ); value = owner.pending_output();
+                self.handshake.write(0, consume owner); value
+            },
+        })
+    }
+    ack = (self: @Self, count: usize) Res<(), Tls13ClientError> {
+        self.established.match({
+            true  => {
+                owner ::= self.session.read(0); result = owner.acknowledge(count);
+                self.session.write(0, consume owner); result
+            },
+            false => {
+                owner ::= self.handshake.read(0); result = owner.acknowledge(count);
+                self.handshake.write(0, consume owner); result
+            },
+        })
+    }
+    feed = (self :: @Self) Res<(), Tls13ClientError> {
+        result = self.established.match({
+            true  => {
+                owner ::= self.session.read(0);
+                result = owner.feed(
+                    self.input.offset(self.consumed),
+                    self.used - self.consumed
+                );
+                self.session.write(0, consume owner); result
+            },
+            false => {
+                owner ::= self.handshake.read(0);
+                result = owner.feed(
+                    self.input.offset(self.consumed),
+                    self.used - self.consumed
+                );
+                self.handshake.write(0, consume owner); result
+            },
+        });
+        count  = result.try();
+        // Zero consumption with supplied bytes is not a kernel wait. The next
+        // engine advance/read must process the complete record first.
+        self.consumed = self.consumed + count; Ok(())
+    }
+    handshake_step = (self :: @Self) i64 {
+        owner ::= self.handshake.read(0);
+        result = owner.advance();
+        self.handshake.write(0, consume owner);
+        result.match({
+            Err(_)       => -1,
+            Ok(progress) => progress.match({
+                NeedOutput  => self.flush(),
+                Runnable    => -3,
+                NeedInput   => {
+                    n = self.receive();
+                    (n == 1).match({true => self.feed().match({Ok(_) => -3, Err(_) => -1}), false => n})
+                },
+                Established => {
+                    current ::= self.handshake.read(0);
+                    transfer = current.take_session();
+                    self.handshake.write(0, consume current);
+                    transfer.match({
+                        Err(_)      => -1,
+                        Ok(session) => { self.session.write(
+                            0,
+                            consume session
+                        ); self.established = true; 1 },
+                    })
+                },
+            }),
+        })
+    }
+    io = (self :: @Self, bytes: Ptr<u8>, count: usize, writing: bool) i64 {
+        self.peer_closed.match({
+            true  => self.peer_shutdown(),
+            false => self.io_open(bytes, count, writing),
+        })
+    }
+    io_open = (self :: @Self, bytes: Ptr<u8>, count: usize, writing: bool) i64 {
+        (count == 0 || bytes.is_null() || self.closing).match({
+            true  => -1,
+            false => (!self.established).match({
+                true  => { n = self.handshake_step(); (n == 1).match({true => -3, false => n}) },
+                false => writing.match({
+                    true  => {
+                        (self.pending_plain == 0).then(() {
+                            amount = (count > 16384).match({true => 16384, false => count});
+                            owner ::= self.session.read(0); result = owner.queue_record(bytes, amount);
+                            self.session.write(0, consume owner);
+                            result.match({Ok(_) => { self.pending_plain = amount; }, Err(_) => ()});
+                        });
+                        (self.pending_plain == 0).match({
+                            true  => -1,
+                            false => {
+                                n = self.flush();
+                                (n == 1).match({true => { sent = self.pending_plain; self.pending_plain = 0; sent.to_u64().to_i32().value_or(
+                                    -1
+                                ).to_i64() }, false => n})
+                            },
+                        })
+                    },
+                    false => {
+                        owner ::= self.session.read(0); result = owner.read_plaintext(bytes, count);
+                        self.session.write(0, consume owner);
+                        result.match({
+                            Err(_)   => -1,
+                            Ok(read) => read.match({
+                                Data(n)   => (n == 0).match({true => -3, false => n.to_u64().to_i32().value_or(
+                                    -1
+                                ).to_i64()}),
+                                Closed    => { self.peer_closed = true; self.peer_shutdown() },
+                                NeedInput => {
+                                    n = self.receive();
+                                    (n == 1).match({true => self.feed().match({Ok(_) => -3, Err(_) => -1}), false => n})
+                                },
+                            }),
+                        })
+                    },
+                }),
+            }),
+        })
+    }
+    finish = (self :: @Self) i64 {
+        (!self.established || self.pending_plain != 0).match({
+            true  => -1,
+            false => {
+                (!self.closing).then(() {
+                    owner ::= self.session.read(
+                        0
+                    ); result = owner.queue_close_notify();
+                    self.session.write(0, consume owner);
+                    result.match({Ok(_) => { self.closing = true; }, Err(_) => ()});
+                });
+                self.closing.match({true => self.flush(), false => -1})
+            },
+        })
+    }
+    close = (self: @Self) {
+        self.established.then(
+            () { owner ::= self.session.read(0); owner.abort(); }
+        );
+        handshake ::= self.handshake.read(0); handshake.abort();
+        Range(0, INPUT).loop((i) { self.input.write(i, 0); });
+        self.alloc.free(self.input); self.alloc.free(self.session); self.alloc.free(self.handshake);
+        socket_close(self.fd);
+    }
+}
+retry = (n: i64) i64 {
+    error = Native.zen_http_errno();
+    (n < 0 && error == Native.EINTR).match({
+        true  => -3,
+        false => (n < 0 && (error == Native.EAGAIN || error == Native.EWOULDBLOCK)).match({true => -2, false => -1}),
+    })
+}
+
+// The socket is already nonblocking/configured. On failure the caller closes
+// it. Temporary entropy is wiped through ordinary stores, without a compiler
+// barrier guarantee. Public random and private scalar are separate OS calls.
+open = (a: Alloc, fd: i32, identity: str, psk: Ptr<u8>, psk_count: usize) Res<Ptr<()>, AllocError
+    | Tls13ClientError> {
+    raw       = a.raw(null_ptr<Handle>().bytes(1), 16).try();
+    handshake = a.raw(null_ptr<Tls13ServerHandshake>().bytes(1), 16).match({
+        Ok(p) => Ok(p.to<Tls13ServerHandshake>()), Err(e) => { a.free(raw); Err(e) },
+    }).try();
+    session   = a.raw(null_ptr<Tls13Session>().bytes(1), 16).match({
+        Ok(p) => Ok(p.to<Tls13Session>()), Err(e) => { a.free(handshake); a.free(raw); Err(e) },
+    }).try();
+    input     = a.raw(INPUT, 8).match({
+        Ok(p) => Ok(p), Err(e) => { a.free(session); a.free(handshake); a.free(raw); Err(e) },
+    }).try();
+    entropy   = a.raw(64, 8).match({
+        Ok(p) => Ok(p), Err(e) => { a.free(input); a.free(session); a.free(handshake); a.free(raw); Err(e) },
+    }).try();
+    @scope.defer(
+        () { Range(0, 64).loop((i) { entropy.write(i, 0); }); a.free(entropy); }
+    );
+    random_ok = fill_random(entropy, 32).match({Ok(_) => true, Err(_) => false})
+        && fill_random(
+            entropy.offset(32),
+            32
+        ).match({Ok(_) => true, Err(_) => false});
+    (!random_ok).then(
+        () { a.free(input); a.free(session); a.free(handshake); a.free(raw); }
+    );
+    random_ok.ensure(Tls13ClientError.Io).try();
+    owner = Tls13ServerHandshake.open(
+        a,
+        SocketFd(raw: fd),
+        identity,
+        psk,
+        psk_count,
+        entropy,
+        entropy.offset(32)
+    ).match({
+        Ok(value) => Ok(consume value),
+        Err(e)    => { a.free(input); a.free(session); a.free(handshake); a.free(raw); Err(e) },
+    }).try();
+    handshake.write(0, consume owner);
+    raw.to<Handle>().write(
+        0,
+        Handle(
+            alloc: a,
+            fd: fd,
+            handshake: handshake,
+            session: session,
+            input: input,
+            established: false,
+            used: 0,
+            consumed: 0,
+            pending_plain: 0,
+            want: Native.POLLIN,
+            armed: 0,
+            closing: false,
+            peer_closed: false
+        )
+    );
+    Ok(raw.to<()>())
+}
+
+NativeBackend* = { identity*: str, psk*: Ptr<u8>, psk_count*: usize }
+NativeBackend.impl(TransportBackend, {
+    listen = (self :: @Self, a: Alloc, host: Ptr<u8>, port: u16) Ptr<()> {
+        fd = socket_listen(a, host, port);
+        (fd < 0).match({true => null_ptr<()>(), false => a.raw(
+            null_ptr<Listener>().bytes(1),
+            16
+        ).match({
+            Err(_)  => { socket_close(fd); null_ptr<()>() },
+            Ok(raw) => { raw.to<Listener>().write(
+                0,
+                Listener(alloc: a, fd: fd)
+            ); raw.to<()>() },
+        })})
+    }
+    listener_close = (self :: @Self, handle: Ptr<()>) { owner = handle.to<Listener>().read(0); socket_close(owner.fd); owner.alloc.free(handle); }
+    accept = (self :: @Self, handle: Ptr<()>) Ptr<()> {
+        listener = handle.to<Listener>().read(0); fd = socket_accept(listener.alloc, listener.fd);
+        (fd < 0).match({true => null_ptr<()>(), false => open(
+            listener.alloc,
+            fd,
+            self.identity,
+            self.psk,
+            self.psk_count
+        ).match({
+            Ok(value) => value, Err(_) => { socket_close(fd); null_ptr<()>() },
+        })})
+    }
+    close = (self :: @Self, handle: Ptr<()>) { owner = handle.to<Handle>().read(0); owner.close(); owner.alloc.free(handle); }
+    listener_fd = (self :: @Self, handle: Ptr<()>) i32 { handle.to<Listener>().read(
+        0
+    ).fd }
+    fd = (self :: @Self, handle: Ptr<()>) i32 { handle.to<Handle>().read(0).fd }
+    io = (self :: @Self, handle: Ptr<()>, bytes: Ptr<u8>, len: usize, writing: i32) i64 {
+        pointer = handle.to<Handle>(); owner ::= pointer.read(0); result = owner.io(bytes, len, writing != 0); pointer.write(0, owner); result
+    }
+    finish = (self :: @Self, handle: Ptr<()>) i64 {
+        pointer = handle.to<Handle>(); owner ::= pointer.read(0); result = owner.finish(); pointer.write(0, owner); result
+    }
+    // Always schedule one local read after a completed response: decrypted or
+    // staged bytes may remain even when the kernel has no readable bytes.
+    resume_read = (self :: @Self, handle: Ptr<()>) i32 {
+        pointer = handle.to<Handle>(); owner ::= pointer.read(0); owner.want = Native.POLLIN; pointer.write(0, owner); 1
+    }
+    requested = (self :: @Self, handle: Ptr<()>) i32 { handle.to<Handle>().read(
+        0
+    ).want }
+    armed = (self :: @Self, handle: Ptr<()>) i32 { handle.to<Handle>().read(
+        0
+    ).armed }
+    mark_armed = (self :: @Self, handle: Ptr<()>, interest: i32) {
+        pointer = handle.to<Handle>(); owner ::= pointer.read(0); owner.armed = interest; pointer.write(0, owner);
+    }
+})

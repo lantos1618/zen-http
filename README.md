@@ -1,6 +1,6 @@
 # zen-http
 
-Standalone HTTP library for Zen. An experimental native TLS client path uses
+Standalone HTTP library for Zen. Experimental native PSK TLS client and HTTP/1 server paths use
 `zen-crypto`; certificate-verified HTTPS still uses OpenSSL. HTTP belongs here; OpenSSL-backed TLS belongs
 in the sibling `zen-openssl` package. `zen-crypto` contains native Zen algorithms
 and `zen-sodium` separately exposes libsodium bindings. Standard-library allocation,
@@ -14,7 +14,7 @@ construction; see [migration instructions](docs/STD_HTTP_MIGRATION.md).
 flowchart TD
     app[Zen applications] --> http[zen-http: HTTP client and server]
     http --> tls[zen-openssl: TLS policy and OpenSSL bindings]
-    http --> crypto[zen-crypto: explicit native PSK TLS client path]
+    http --> crypto[zen-crypto: explicit native PSK TLS paths]
     crypto --> std
     http --> std[std: memory, bytes and OS primitives]
     tls --> std
@@ -22,6 +22,12 @@ flowchart TD
 ```
 
 ## Implemented
+
+- `http.native_server.serve_psk(alloc, options, handler)` serves HTTP/1 over
+  native external-PSK/X25519 TLS using the shared reactor, with resumable
+  handshakes and record I/O. [Build, tests and limits](docs/NATIVE_TLS_REACTOR.md).
+  This explicit experimental target links no OpenSSL/libsodium; it does not
+  provide certificate authentication or browser HTTPS.
 
 - `serve(alloc, options, handler)` runs a single-threaded HTTP/1.1 server.
   Implement `Handler.handle(Request) -> Response`; the echo application is in
@@ -54,8 +60,9 @@ Current server limits: IPv4; 256 simultaneous connections; 8 KiB / 64 fields per
 64 KiB request and response bodies; 36 MiB reserved for the HTTP connection
 buffers (not a measured RSS figure); ten-second idle timeout; fixed
 `application/octet-stream` response type; 200/400/404 response statuses.
-Responses include a cached Date header. TLS currently uses TLS 1.3 and
-AES-128-GCM, matching the benchmark baseline. Invalid or unsupported framing
+Responses include a cached Date header. The OpenSSL target uses TLS 1.3 and
+AES-128-GCM, matching the benchmark baseline. The native PSK target uses
+TLS_CHACHA20_POLY1305_SHA256 and X25519; it has not been benchmarked. Invalid or unsupported framing
 closes the connection. Bounded chunked request decoding is implemented; legal
 chunk extensions and many trailers remain unsupported. Expect, upgrades,
 streaming handlers, graceful shutdown and HTTP/3 are not implemented. The
