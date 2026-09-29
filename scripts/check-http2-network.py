@@ -49,6 +49,32 @@ def server(binary):
             except subprocess.TimeoutExpired:
                 child.kill(); child.wait()
 
+def descriptor_count(child):
+    proc = Path('/proc') / str(child.pid) / 'fd'
+    if proc.is_dir():
+        return len(list(proc.iterdir()))
+    result = subprocess.run(['/usr/sbin/lsof', '-a', '-p', str(child.pid), '-Ff'], capture_output=True, text=True, check=True)
+    return sum(line.startswith('f') and line[1:].isdigit() for line in result.stdout.splitlines())
+
+def readiness_cleanup(child):
+    # Exercise owner cleanup before and after Wire is moved into Session.
+    with Peer(): pass
+    time.sleep(.1)
+    baseline = descriptor_count(child)
+    for _ in range(24):
+        raw = socket.create_connection(('127.0.0.1', PORT), timeout=4)
+        if SECURE:
+            context = ssl.create_default_context(cafile=str(ROOT/'build/cert.pem'))
+            context.set_alpn_protocols(['h2'])
+            raw = context.wrap_socket(raw, server_hostname='localhost')
+        with raw:
+            raw.sendall(b'x' * 24)
+            assert raw.recv(1) == b'', 'invalid preface accepted'
+        with Peer(): pass
+    time.sleep(.1)
+    assert descriptor_count(child) == baseline, 'connection readiness descriptor leaked'
+    print('H2 readiness cleanup: 24 preface failures + 24 established disconnects PASS', flush=True)
+
 def wire(kind, flags, sid, data=b''):
     return len(data).to_bytes(3, 'big') + bytes((kind, flags)) + sid.to_bytes(4, 'big') + data
 
@@ -213,5 +239,7 @@ def checks():
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('--binary',default='build/zen-h2-server');args=parser.parse_args()
     for SECURE in (False,True):
-        with server(args.binary): checks()
+        with server(args.binary) as child:
+            checks()
+            readiness_cleanup(child)
         print(('TLS h2 ALPN' if SECURE else 'plaintext h2c') + ' suite PASS',flush=True)

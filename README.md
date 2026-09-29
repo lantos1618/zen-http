@@ -27,11 +27,11 @@ flowchart TD
 - Zen owns parsing, framing, request/response buffers, dispatch, connection
   state, partial writes and keep-alive/pipelining. Readiness uses kqueue on macOS
   and epoll on Linux through `std.net.readiness`; see the required compiler
-  revision and transitional H2 adapter in [STD_READINESS.md](docs/STD_READINESS.md).
+  revision and H2 ownership details in [STD_READINESS.md](docs/STD_READINESS.md).
   Zen owns socket read/write decisions and TLS retry/readiness transitions.
-  Native adapters still handle socket creation, session creation/cleanup, OS
-  readiness ABI details. HTTP/1 readiness ownership and registration policy
-  are now Zen; the H2 compatibility adapter still retains some C policy.
+  Zen also owns listener/connection allocation, socket setup and cleanup, and
+  OpenSSL session creation. Both HTTP/1 and H2 use the std readiness owner;
+  OS event layouts and syscall macros still require platform ABI bindings.
 - An experimental HTTP/2 echo listener is available as `build/zen-h2-server`
   on loopback18082, with `--tls` enabling TLS1.3 and h2 ALPN. It has
   concurrent streams inside one active TCP connection; see its limits below.
@@ -43,8 +43,10 @@ Request strings are borrowed for the synchronous handler call. Do not retain
 them, send them to an actor without copying, or return storage whose lifetime
 has ended. Response bytes must remain live until the server copies them after
 the handler returns. Allocation belongs to the caller; the server preallocates
-its HTTP buffers and reuses them. OpenSSL/native connection allocations are
-separate and are not claimed to be allocation-free.
+its HTTP buffers and reuses them. Transports use an explicit std pool so
+connection churn does not retain per-connection allocations in a long-lived
+arena; its cache has a fixed limit. OpenSSL allocations remain separate and
+are not claimed to be allocation-free.
 
 Current server limits: IPv4; 256 simultaneous connections; 8 KiB / 64 fields per header block;
 64 KiB request and response bodies; 36 MiB reserved for the HTTP connection
@@ -195,8 +197,10 @@ ALPN. This is a bounded interoperability check, not full HTTP/2 conformance.
 
 Server TLS policy and context lifetime now also live in Zen (`ServerContext`
 in `zen-openssl`). OpenSSL supplies the cryptographic implementation. The remaining
-C adapters cover socket setup/readiness, session creation/cleanup, and native
-ABI details. Socket read/write policy and nonblocking TLS retry decisions are Zen. Reducing those adapters further is tracked work; this is not yet an
+C adapters cover platform readiness ABI, errno, date/time access, OpenSSL const
+and callback signatures, and the Linux SIGPIPE-safe socket BIO. The BIO still
+contains I/O policy. Socket setup, allocation, cleanup and nonblocking TLS retry
+decisions are Zen. This is not yet an
 entirely Zen transport. Existing standard-library APIs are retained for migration.
 
 

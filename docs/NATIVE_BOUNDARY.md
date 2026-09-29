@@ -38,13 +38,18 @@ and nonblocking TLS retry decisions. The first follow-up conversion moves client
 context construction and the server's selected-ALPN check into Zen; borrowed
 OpenSSL accessors remain ABI glue. No throughput gain follows from that change.
 
-Remaining handwritten native work includes socket setup/accept/cleanup,
-kqueue/epoll registration and event extraction, HTTP date formatting/cache,
-OpenSSL session setup and the Linux MSG_NOSIGNAL socket BIO. The BIO is functional
-I/O code, not merely a declaration. It must retain its disconnect protections
-through any conversion. Vetted crypto backends stay in place; replacing them
-needs a separate implementation, vector, interoperability and side-channel
-validation effort.
+The listener/connection records, allocation, socket setup, failure cleanup,
+OpenSSL session construction and H2 readiness ownership now live in Zen.
+The server uses std pool allocation for transport storage because a caller arena
+may not reclaim individual frees. `src/reactor.h` has been removed. Remaining handwritten package C includes
+an IPv4 address-field accessor, errno access and HTTP date/time helpers, OpenSSL const/callback ABI adapters,
+and the Linux MSG_NOSIGNAL socket BIO. The BIO still contains allocation,
+retry and lifetime logic; it is not merely a declaration. Its disconnect
+protections must survive a future conversion. Generic std readiness still
+uses a platform header for kqueue/epoll layouts and syscall macros.
+
+Moving OpenSSL setup into `.zen` does not make its cryptography native Zen.
+The separate native PSK path and its security limits remain unchanged.
 
 ## Existing standard-library overlap
 

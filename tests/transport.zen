@@ -1,10 +1,111 @@
-transport_io, resume_read = http.transport
-NativeTransport = c.record("transport.h", "struct transport", {
-    fd: i32,
-    ssl: Ptr<()>,
-    want: i32,
-    armed: i32,
+zen_http_listen, zen_http_accept, zen_http_close, zen_http_listener_close, zen_http_fd, zen_http_listener_fd = http.transport
+Pool, PoolAlloc, PoolPolicy = std.mem.mem_pool
+Socket, SocketFault = std.net.socket
+TestAddr = c.record("transport.h", "struct sockaddr_in", { sin_port: u16 })
+Probe = c.bind("transport.h", {
+    usleep = (micros: u32) i32
+    F_GETFD: i32
+    F_GETFL: i32
+    FD_CLOEXEC: i32
+    O_NONBLOCK: i32
+    fcntl = (fd: i32, command: i32, value: i32) i32
+    getsockname = (fd: i32, address: Ptr<()>, size: Ptr<u32>) i32
+    ntohs = (value: u16) u16
 })
+FaultAlloc = { base: Alloc, calls: Ptr<usize>, live: Ptr<usize>, fail: Ptr<usize> }
+FaultAlloc.impl(Alloc, {
+    raw = (self: @Self, count: usize, align: usize) Res<Ptr<u8>, AllocError> {
+        current = self.calls.read(0); self.calls.write(0, current + 1);
+        (current != self.fail.read(0)).ensure(AllocError.OutOfMemory).try();
+        result = self.base.raw(count, align).try();
+        self.live.write(0, self.live.read(0) + 1); Ok(result)
+    }
+    realloc = <T>(self: @Self, pointer: Ptr<T>, count: usize) Res<Ptr<T>, AllocError> {
+        pointer.is_null().ensure(AllocError.OutOfMemory).try();
+        p = self.raw(pointer.bytes(count), 16).try(); Ok(p.to<T>())
+    }
+    free = <T>(self: @Self, pointer: Ptr<T>) {
+        self.live.write(0, self.live.read(0) - 1); self.base.free(pointer);
+    }
+})
+fd_count = () usize {
+    count: usize ::= 0;
+    fd: i32      ::= 0;
+    loop(() { fd < 256 }, (h) {
+        (Probe.fcntl(fd, Probe.F_GETFD, 0) >= 0).then(() { count = count + 1; });
+        fd = fd + 1;
+    }); count
+}
+accept_ready = (listener: Ptr<()>) Ptr<()> {
+    result   ::= null_ptr<()>();
+    attempts ::= 0;
+    loop(() { result.is_null() && attempts < 100 }, (h) {
+        result = zen_http_accept(listener);
+        result.is_null().then(() { Probe.usleep(1000); });
+        attempts = attempts + 1;
+    }); result
+}
+lifecycle = (a: Alloc) Res<(), AllocError | Failure> {
+    pool = a.realloc<Pool>(null_ptr<Pool>(), 1).try(); pool.write(0, Pool());
+    @scope.defer(() { state ::= pool.read(0); state.close(); a.free(pool); });
+    pooled   = PoolAlloc(
+        pool: pool,
+        policy: PoolPolicy(cache_bytes: 65536, block_bytes: 1024, blocks: 512)
+    );
+    counters = a.realloc<usize>(null_ptr<usize>(), 3).try();
+    @scope.defer(() { a.free(counters); });
+    calls = counters; live = counters.offset(1); fail = counters.offset(2);
+    fault = FaultAlloc(base: pooled, calls: calls, live: live, fail: fail);
+    host ::= a.Vec<u8>(); Range(0, 9).loop((i) { host.add("127.0.0.1"[i]).try(); }); host.add(0).try();
+    baseline = fd_count();
+    Range(0, 4).loop((cut) {
+        calls.write(0, 0); live.write(0, 0); fail.write(0, cut);
+        listener = zen_http_listen(fault, host.ptr(), 0, null_ptr<()>());
+        listener.is_null().ensure(Failure.Incorrect).try();
+        (live.read(0) == 0 && fd_count() == baseline).ensure(Failure.Incorrect).try();
+    });
+    calls.write(0, 0); live.write(0, 0); fail.write(0, usize.MAX);
+    listener = zen_http_listen(fault, host.ptr(), 0, null_ptr<()>());
+    (!listener.is_null()).ensure(Failure.Setup).try();
+    address = a.realloc<TestAddr>(null_ptr<TestAddr>(), 1).try();
+    size    = a.realloc<u32>(null_ptr<u32>(), 1).try(); size.write(0, 16);
+    (Probe.getsockname(zen_http_listener_fd(listener), address.to<()>(), size) == 0).ensure(Failure.Setup).try();
+    port = Probe.ntohs(address.read(0).sin_port);
+    Range(0, 2).loop((cut) {
+        client ::= Socket.tcp_connect(a, "127.0.0.1", port).try(Failure.Setup);
+        before = fd_count(); calls.write(0, 0); fail.write(0, cut);
+        rejected ::= null_ptr<()>(); attempts ::= 0;
+        loop(() { calls.read(0) <= cut && attempts < 100 }, (h) {
+            rejected = zen_http_accept(listener);
+            rejected.is_null().ensure(Failure.Incorrect).try();
+            attempts = attempts + 1; Probe.usleep(1000);
+        });
+        (calls.read(0) == cut + 1).ensure(Failure.Incorrect).try();
+        (rejected.is_null() && live.read(0) == 1 && fd_count() == before).ensure(Failure.Incorrect).try();
+        client.close();
+    });
+    fail.write(0, usize.MAX);
+    Range(0, 128).loop((i) {
+        client ::= Socket.tcp_connect(a, "127.0.0.1", port).try(Failure.Setup);
+        accepted = accept_ready(listener);
+        (!accepted.is_null()).ensure(Failure.Setup).try();
+        fd      = zen_http_fd(accepted);
+        fdflags = Probe.fcntl(fd, Probe.F_GETFD, 0);
+        (fdflags % 2 == Probe.FD_CLOEXEC).ensure(Failure.Incorrect).try();
+        flags = Probe.fcntl(fd, Probe.F_GETFL, 0);
+        ((flags / Probe.O_NONBLOCK) % 2 == 1).ensure(Failure.Incorrect).try();
+        zen_http_close(accepted); client.close();
+        (live.read(0) == 1).ensure(Failure.Incorrect).try();
+    });
+    zen_http_listener_close(listener);
+    stats = pool.read(0).snapshot();
+    (live.read(0) == 0 && fd_count() == baseline && stats.live_bytes == 0 && stats.allocations <= 6 && stats.reuses >= 128).ensure(Failure.Incorrect).try();
+    println(
+        "transport listener allocation failure, accept cleanup, flags and 128 pooled connections PASS"
+    );
+    Ok(())
+}
+transport_io, resume_read, Transport = http.transport
 Native = c.bind("transport.h", {
     AF_UNIX: i32
     SOCK_STREAM: i32
@@ -18,7 +119,8 @@ Native = c.bind("transport.h", {
 })
 Failure = Setup | Incorrect
 main = (env: Env) Res<(), AllocError | Failure> {
-    a   = env.mem.alloc();
+    a = env.mem.alloc();
+    lifecycle(a).try();
     fds = a.realloc<i32>(null_ptr<i32>(), 2).try();
     (Native.socketpair(Native.AF_UNIX, Native.SOCK_STREAM, 0, fds) == 0).ensure(Failure.Setup).try();
     left  = fds.read(0);
@@ -26,15 +128,15 @@ main = (env: Env) Res<(), AllocError | Failure> {
     @scope.defer(() { Native.close(left); });
     (Native.fcntl(left, Native.F_SETFL, Native.O_NONBLOCK) == 0).ensure(Failure.Setup).try();
     (Native.fcntl(right, Native.F_SETFL, Native.O_NONBLOCK) == 0).ensure(Failure.Setup).try();
-    sender   = a.realloc<NativeTransport>(null_ptr<NativeTransport>(), 1).try();
-    receiver = a.realloc<NativeTransport>(null_ptr<NativeTransport>(), 1).try();
+    sender   = a.realloc<Transport>(null_ptr<Transport>(), 1).try();
+    receiver = a.realloc<Transport>(null_ptr<Transport>(), 1).try();
     sender.write(
         0,
-        NativeTransport(fd: left, ssl: null_ptr<()>(), want: 0, armed: 0)
+        Transport(alloc: a, fd: left, ssl: null_ptr<()>(), want: 0, armed: 0)
     );
     receiver.write(
         0,
-        NativeTransport(fd: right, ssl: null_ptr<()>(), want: 0, armed: 0)
+        Transport(alloc: a, fd: right, ssl: null_ptr<()>(), want: 0, armed: 0)
     );
     buffer = a.realloc<u8>(null_ptr<u8>(), 65536).try();
     Range(0, 65536).loop((i) { buffer.write(i, 42); });

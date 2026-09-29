@@ -1,18 +1,13 @@
-Ptr, null_ptr = std.mem
+Ptr, null_ptr, Pool, PoolAlloc, PoolPolicy = std.mem
 Readiness, Interest, WaitResult = std.net.readiness
 str_at = std.text
 ServerContext, TlsFault = tls
 transport_io, resume_read, transport_requested, transport_armed, transport_mark_armed = http.transport
 ChunkDecoder, ChunkError = http.chunked
-Native = c.bind("reactor.h", {
-    zen_http_listen = (host: Ptr<u8>, port: u16, context: Ptr<()>) Ptr<()>
-    zen_http_listener_close = (listener: Ptr<()>) ()
-    zen_http_accept = (listener: Ptr<()>) Ptr<()>
-    zen_http_close = (transport: Ptr<()>) ()
+zen_http_listen, zen_http_listener_close, zen_http_accept, zen_http_close, zen_http_listener_fd, zen_http_fd = http.transport
+Native = c.bind("transport.h", {
     zen_http_seconds = () u64
     zen_http_date = () Ptr<u8>
-    zen_http_listener_fd = (listener: Ptr<()>) i32
-    zen_http_fd = (transport: Ptr<()>) i32
     POLLOUT: i32
     memmove = (dst: Ptr<u8>, src: Ptr<u8>, len: usize) Ptr<u8>
 })
@@ -49,7 +44,7 @@ Connection = {
     runnable :: bool,
 
     close = (self :: @Self) {
-        Native.zen_http_close(self.transport);
+        zen_http_close(self.transport);
         self.transport = null_ptr<()>();
     }
 
@@ -296,8 +291,8 @@ serve* = (a: Alloc, options: Options, handler :: Handler) Res<(), AllocError
     | ServerError> {
     (!options.host.contains(0) && !options.certificate.contains(0) && !options.private_key.contains(0))
         .ensure(ServerError.Listen).try();
-    host     = options.host.c_text(a).try();
-    context  = options.tls.match({
+    host    = options.host.c_text(a).try();
+    context = options.tls.match({
         true  => ServerContext.create(
             a,
             options.certificate,
@@ -305,9 +300,27 @@ serve* = (a: Alloc, options: Options, handler :: Handler) Res<(), AllocError
         ).try(ServerError.Listen),
         false => ServerContext(handle: null_ptr<()>()),
     });
-    listener = Native.zen_http_listen(host.ptr(), options.port, context.handle);
+    // The caller's allocator may be an arena with no individual free. Reuse
+    // transport storage across connection churn, with an explicit cache bound.
+    transport_pool = a.realloc<Pool>(null_ptr<Pool>(), 1).try();
+    transport_pool.write(0, Pool());
+    @scope.defer(() {
+        pool ::= transport_pool.read(0);
+        pool.close();
+        a.free(transport_pool);
+    });
+    transport_alloc = PoolAlloc(
+        pool: transport_pool,
+        policy: PoolPolicy(cache_bytes: 65536, block_bytes: 1024, blocks: 512)
+    );
+    listener        = zen_http_listen(
+        transport_alloc,
+        host.ptr(),
+        options.port,
+        context.handle
+    );
     (!listener.is_null()).ensure(ServerError.Listen).try();
-    @scope.defer(() { Native.zen_http_listener_close(listener); });
+    @scope.defer(() { zen_http_listener_close(listener); });
     connections = a.realloc<Connection>(null_ptr<Connection>(), SLOTS).try();
     Range(0, SLOTS).loop((i) {
         connections.write(
@@ -338,7 +351,7 @@ serve* = (a: Alloc, options: Options, handler :: Handler) Res<(), AllocError
     });
     reactor ::= Readiness.open(a, SLOTS + 1).try(ServerError.Poll);
     reactor.add(
-        Native.zen_http_listener_fd(listener),
+        zen_http_listener_fd(listener),
         SLOTS,
         Interest.Read
     ).try(ServerError.Poll);
@@ -362,7 +375,7 @@ serve* = (a: Alloc, options: Options, handler :: Handler) Res<(), AllocError
                         c ::= connections.read(i);
                         c.transport.is_null().then(() {
                             full      = false;
-                            transport = Native.zen_http_accept(listener);
+                            transport = zen_http_accept(listener);
                             transport.is_null().then(
                                 () { accept_loop.break(0); }
                             );
@@ -373,7 +386,7 @@ serve* = (a: Alloc, options: Options, handler :: Handler) Res<(), AllocError
                             want     = transport_requested(transport);
                             interest = (want == Native.POLLOUT).match({true => Interest.Write, false => Interest.Read});
                             reactor.add(
-                                Native.zen_http_fd(transport),
+                                zen_http_fd(transport),
                                 i,
                                 interest
                             ).match({
@@ -385,9 +398,9 @@ serve* = (a: Alloc, options: Options, handler :: Handler) Res<(), AllocError
                     });
                     // Refuse overload instead of spinning on a readable listener.
                     full.then(() {
-                        refused = Native.zen_http_accept(listener);
+                        refused = zen_http_accept(listener);
                         (!refused.is_null()).then(
-                            () { Native.zen_http_close(refused); }
+                            () { zen_http_close(refused); }
                         );
                     });
                 },
@@ -416,7 +429,7 @@ serve* = (a: Alloc, options: Options, handler :: Handler) Res<(), AllocError
                     (want != transport_armed(c.transport)).then(() {
                         interest = (want == Native.POLLOUT).match({true => Interest.Write, false => Interest.Read});
                         reactor.modify(
-                            Native.zen_http_fd(c.transport),
+                            zen_http_fd(c.transport),
                             slot,
                             interest
                         ).match({

@@ -18,15 +18,13 @@ close the affected transport, including a potentially partial kqueue update.
 
 The standard primitive has no HTTP capacities, slots, policy or actor dependency.
 Its C header only bridges native event layouts and syscall/macro ABI. Transport
-interest/armed metadata in this package is accessed by Zen through `c.record`.
-No direct epoll/kevent calls remain in `src/reactor.h`.
+interest/armed metadata now lives in ordinary Zen transport records.
 
-HTTP/2 still borrows an opaque reactor handle inside its experimental `NetworkIo`
-owner. A transitional adapter in `src/reactor.h` delegates its platform work to
-the same standard-library ABI, but retains allocation, armed-interest comparison,
-and EINTR-to-empty compatibility logic in C. Therefore this migration does not
-claim that all H2 readiness policy is already Zen. A future H2 ownership change
-must replace the adapter without copying the standard library's Drop owner.
+HTTP/2 now owns its `Readiness` value in Zen and borrows it during network I/O.
+Allocation, armed-interest comparison, registration and interrupted-wait handling
+have moved out of the deleted `src/reactor.h`. The Drop owner is not copied into
+wire/session descriptors. H2 retains its existing experimental one-active-TCP-
+connection behavior; this conversion does not introduce a multiplexed listener.
 
 The current compiler actor backend uses one pthread worker per actor and
 condition-variable mailbox wakeups. It does not provide a network event loop.

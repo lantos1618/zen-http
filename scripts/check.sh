@@ -33,7 +33,7 @@ clang -O2 -g -fsanitize=undefined -fno-sanitize-recover=all \
     build/openssl/lib/libssl.a build/openssl/lib/libcrypto.a -o build/zen-h2-sanitized-server
 "$python" scripts/check-http2-network.py --binary build/zen-h2-sanitized-server
 clang -O2 -g -fsanitize=undefined -fno-sanitize-recover=all \
-    -I"$stdlib/std/net" -Isrc -I../zen-openssl/src -Ibuild/openssl/include -include src/reactor.h \
+    -I"$stdlib/std/net" -Isrc -I../zen-openssl/src -Ibuild/openssl/include \
     build/zen.c build/openssl/lib/libssl.a build/openssl/lib/libcrypto.a \
     -o build/zen-sanitized-server
 "$python" tests/check.py --server zen-sanitized

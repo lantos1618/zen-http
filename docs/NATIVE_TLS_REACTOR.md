@@ -8,8 +8,9 @@ an already authenticated blocking session.
 
 ## Current boundary
 
-- `src/transport.h` accepts nonblocking sockets, but its listener/connection
-  layouts contain `SSL_CTX*`/`SSL*` and unconditionally include `zen_tls.h`.
+- `src/http/transport.zen` owns nonblocking socket setup and the Zen
+  listener/connection records. They still carry opaque OpenSSL session/context
+  handles; `src/transport.h` no longer contains SSL layouts or includes.
 - `src/http/transport.zen` maps OpenSSL progress to bytes, read/write interest,
   and closure. It also handles raw socket errno and buffered TLS input.
 - `src/http/server.zen` limits each drive round to 64 transitions/eight responses
@@ -67,9 +68,10 @@ message-size, empty-record and parser limits must survive the refactor.
    Bound admitted handshakes and scheduler work; X25519 remains CPU work even
    after socket blocking is removed.
 
-3. **Separate socket setup from the OpenSSL adapter.** Keep platform socket ABI
-   glue small and preserve nonblocking mode, close-on-exec and SIGPIPE protection.
-   Remove SSL types/includes from the generic listener/connection boundary.
+3. **Separate transport backend selection.** Socket setup and handle allocation
+   have moved to Zen, preserving nonblocking mode, close-on-exec and SIGPIPE
+   protection. Select native versus OpenSSL session state explicitly rather
+   than treating the current opaque handles as interchangeable.
    Store each owning TLS engine at a stable location; HTTP slot copies should
    carry borrowed handles, not duplicate a Drop-owning session. Gate: allocation
    failure, connection timeout, abort and repeated cleanup release resources
