@@ -75,7 +75,7 @@ transport_requested* = (handle: Ptr<()>) i32 { handle.to<NativeTransport>().read
 transport_armed* = (handle: Ptr<()>) i32 { handle.to<NativeTransport>().read(
     0
 ).armed }
-transport_mark_armed* = (handle: Ptr<()>, interest: i32) () {
+transport_mark_armed* = (handle: Ptr<()>, interest: i32) {
     pointer = handle.to<NativeTransport>();
     transport ::= pointer.read(0);
     transport.armed = interest;

@@ -65,7 +65,7 @@ H2RequestDecoder* = {
         ))
         } })
     }
-    evict = (self :: @Self, required: usize) () {
+    evict = (self :: @Self, required: usize) {
         loop(() { self.count > 0 && self.cost + required > self.maximum }, (h) {
             self.count = self.count - 1;
             bytes      = self.names[self.count] + self.values[self.count];

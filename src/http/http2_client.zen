@@ -434,7 +434,7 @@ H2Client* = {
     }
 
     // GOAWAY is best-effort; the transport always closes.
-    close* = (self :: @Self, a: Alloc) () {
+    close* = (self :: @Self, a: Alloc) {
         last: usize = (self.sid >= 3).match({ true => self.sid - 2, false => 0 });
         self.write_goaway(a, last).match({ Ok(_) => (), Err(_) => () });
         self.stream.close();
