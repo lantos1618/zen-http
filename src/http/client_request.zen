@@ -1,8 +1,32 @@
 Alloc = std.mem
 str, String = std.text
 Vec = std.collections
+Range = std.core
 ParsedUrl = std.net.url
 HttpError = http.response_types
+
+has_invalid_byte = (value: str, reject_space: bool) bool {
+    invalid ::= false;
+    Range(0, value.len).loop((i) {
+        byte    = value.index(i);
+        invalid = invalid || byte < ' ' || byte == 127 || (reject_space && byte == ' ');
+    });
+    invalid
+}
+
+valid_header = (header: str) bool {
+    header.find(':').match({
+        None      => false,
+        Ok(colon) => {
+            name = header.slice(0, colon);
+            colon > 0 && !has_invalid_byte(header, false)
+                && !has_invalid_byte(name, true)
+                && !name.eq_ignore_case("host")
+                && !name.eq_ignore_case("content-length")
+                && !name.eq_ignore_case("transfer-encoding")
+        },
+    })
+}
 
 build_request* = (
     parsed  : ParsedUrl,
@@ -10,6 +34,12 @@ build_request* = (
     headers : Vec<str>,
     body    : str
 ) Res<String, HttpError> {
+    (parsed.host.len > 0 && parsed.path.len > 0
+        && !has_invalid_byte(parsed.host, true)
+        && !has_invalid_byte(parsed.path, true)).ensure(HttpError.SendFailed).try();
+    headers.loop((h, header) {
+        valid_header(header).ensure(HttpError.SendFailed).try();
+    });
     sb ::= a.String().try(HttpError.SendFailed);
 
     sb.add("POST ").try(HttpError.SendFailed);

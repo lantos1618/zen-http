@@ -1,0 +1,46 @@
+// A caller cannot turn one request target or header into additional wire fields.
+build_request = http.client_request
+ParsedUrl = std.net.url
+
+accepted = (a: Alloc, host: str, path: str, header: str) Res<bool, AllocError> {
+    headers ::= a.Vec<str>();
+    (header.len > 0).then(() { headers.add(header).try(); });
+    url = ParsedUrl(scheme: "http", host: host, port: 80, path: path);
+    Ok(
+        url.build_request(
+            a,
+            headers,
+            "body"
+        ).match({ Ok(_) => true, Err(_) => false })
+    )
+}
+
+main = (env: Env) Res<(), AllocError> {
+    a    = env.mem.alloc();
+    good = accepted(
+        a,
+        "example.test",
+        "/upload",
+        "Authorization: Bearer token"
+    ).try();
+    bad  = !accepted(a, "example.test", "/ok\r\nX-Injected: path", "").try()
+        && !accepted(a, "example.test\r\nX-Injected: host", "/", "").try()
+        && !accepted(a, "example.test", "/with space", "").try()
+        && !accepted(
+            a,
+            "example.test",
+            "/",
+            "X-Trace: ok\r\nX-Injected: header"
+        ).try()
+        && !accepted(a, "example.test", "/", "X-Trace: a\0b").try()
+        && !accepted(a, "example.test", "/", "Host: other.test").try()
+        && !accepted(a, "example.test", "/", "Content-Length: 0").try()
+        && !accepted(
+            a,
+            "example.test",
+            "/",
+            "Transfer-Encoding: chunked"
+        ).try();
+    (good && bad).match({ true => println("request controls ok"), false => println("request controls failed") });
+    Ok(())
+}
